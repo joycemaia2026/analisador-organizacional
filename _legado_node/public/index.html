@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Análise de Perfil Profissional</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #f5f6f8;
+    margin: 0;
+    padding: 40px 20px;
+    color: #1f2430;
+  }
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 12px;
+    padding: 32px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px;
+  }
+  p.subtitle {
+    color: #666;
+    margin: 0 0 28px;
+    font-size: 14px;
+  }
+  label {
+    display: block;
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: #333;
+  }
+  select, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d7dae0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    margin-bottom: 20px;
+    background: #fff;
+  }
+  textarea {
+    min-height: 110px;
+    resize: vertical;
+  }
+  #perfilInfo {
+    font-size: 13px;
+    color: #555;
+    background: #f0f2f5;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: -10px 0 20px;
+    display: none;
+  }
+  button {
+    background: #2a5bd7;
+    color: #fff;
+    border: none;
+    padding: 11px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled {
+    background: #9db0e8;
+    cursor: not-allowed;
+  }
+  #resultado {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid #eaeaea;
+  }
+  #resultado h2 {
+    font-size: 15px;
+    margin: 0 0 10px;
+  }
+  #solucao {
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.55;
+    background: #fafbfc;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 60px;
+  }
+  .erro {
+    color: #c0392b;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>Análise de Situação por Perfil Profissional</h1>
+    <p class="subtitle">Selecione uma pessoa, descreva o problema e receba uma análise baseada na experiência e formação dela.</p>
+
+    <label for="perfilSelect">Perfil</label>
+    <select id="perfilSelect">
+      <option value="">Carregando perfis...</option>
+    </select>
+    <div id="perfilInfo"></div>
+
+    <label for="problema">Problema / situação</label>
+    <textarea id="problema" placeholder="Ex: O ticket de atendimento está demorando para ser atendido, gerando acúmulo massivo de chamados..."></textarea>
+
+    <button id="btnAnalisar">Analisar</button>
+    <div class="erro hidden" id="erroMsg"></div>
+
+    <div class="hidden" id="resultado">
+      <h2>Análise / solução sugerida</h2>
+      <div id="solucao"></div>
+    </div>
+  </div>
+
+<script>
+  const perfilSelect = document.getElementById('perfilSelect');
+  const perfilInfo = document.getElementById('perfilInfo');
+  const problemaInput = document.getElementById('problema');
+  const btnAnalisar = document.getElementById('btnAnalisar');
+  const resultado = document.getElementById('resultado');
+  const solucaoDiv = document.getElementById('solucao');
+  const erroMsg = document.getElementById('erroMsg');
+
+  let perfis = [];
+
+  async function carregarPerfis() {
+    try {
+      const res = await fetch('/api/perfis');
+      perfis = await res.json();
+      perfilSelect.innerHTML = '<option value="">Selecione uma pessoa...</option>' +
+        perfis.map(p => `<option value="${p.id}">${p.nome} — ${p.cargo_atual}</option>`).join('');
+    } catch (e) {
+      perfilSelect.innerHTML = '<option value="">Erro ao carregar perfis</option>';
+    }
+  }
+
+  perfilSelect.addEventListener('change', () => {
+    const p = perfis.find(x => x.id === perfilSelect.value);
+    if (p) {
+      perfilInfo.style.display = 'block';
+      perfilInfo.textContent = `${p.cargo_atual}`;
+    } else {
+      perfilInfo.style.display = 'none';
+    }
+  });
+
+  btnAnalisar.addEventListener('click', async () => {
+    erroMsg.classList.add('hidden');
+    resultado.classList.add('hidden');
+
+    const perfilId = perfilSelect.value;
+    const problema = problemaInput.value.trim();
+
+    if (!perfilId || !problema) {
+      erroMsg.textContent = 'Selecione um perfil e descreva o problema.';
+      erroMsg.classList.remove('hidden');
+      return;
+    }
+
+    btnAnalisar.disabled = true;
+    btnAnalisar.textContent = 'Analisando...';
+
+    try {
+      const res = await fetch('/api/analisar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ perfilId, problema })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        erroMsg.textContent = data.erro || 'Erro ao gerar análise.';
+        erroMsg.classList.remove('hidden');
+      } else {
+        solucaoDiv.textContent = data.analise;
+        resultado.classList.remove('hidden');
+      }
+    } catch (e) {
+      erroMsg.textContent = 'Erro de conexão com o servidor.';
+      erroMsg.classList.remove('hidden');
+    } finally {
+      btnAnalisar.disabled = false;
+      btnAnalisar.textContent = 'Analisar';
+    }
+  });
+
+  carregarPerfis();
+</script>
+</body>
+</html>

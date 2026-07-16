@@ -1,0 +1,14 @@
+{
+  "name": "perfil-analitico-app",
+  "version": "1.0.0",
+  "description": "Ferramenta para analisar problemas da empresa com base no perfil profissional das pessoas.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5",
+    "openai": "^4.55.0"
+  }
+}

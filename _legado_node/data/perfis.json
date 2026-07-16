@@ -1,0 +1,62 @@
+[
+  {
+    "id": "1",
+    "nome": "Ana Ribeiro",
+    "cargo_atual": "Gerente de Operações de Atendimento",
+    "experiencia": [
+      "8 anos em gestão de centrais de atendimento (call center e suporte omnichannel)",
+      "Liderou reestruturação de filas de tickets em empresa de telecom, reduzindo tempo médio de resposta em 40%",
+      "Experiência com dimensionamento de equipe (workforce management) e SLAs"
+    ],
+    "formacao": [
+      "MBA em Gestão de Operações e Processos - FGV",
+      "Graduação em Administração - PUC"
+    ],
+    "competencias_chave": ["priorização de filas", "SLA", "dimensionamento de equipe", "processos operacionais"]
+  },
+  {
+    "id": "2",
+    "nome": "Bruno Castro",
+    "cargo_atual": "Analista de Dados Sênior",
+    "experiencia": [
+      "6 anos analisando dados de atendimento ao cliente e operações",
+      "Construiu dashboards de monitoramento de volume de tickets e tempo de fila em tempo real",
+      "Realizou análises de causa raiz em gargalos operacionais usando SQL e Python"
+    ],
+    "formacao": [
+      "Pós-graduação em Ciência de Dados - USP",
+      "Graduação em Engenharia de Produção - UFMG"
+    ],
+    "competencias_chave": ["análise de causa raiz", "modelagem de dados", "identificação de gargalos", "métricas operacionais"]
+  },
+  {
+    "id": "3",
+    "nome": "Carla Nogueira",
+    "cargo_atual": "Product Manager - Plataforma de Suporte",
+    "experiencia": [
+      "5 anos em produto para ferramentas internas de atendimento e helpdesk",
+      "Implementou automações e triagem inteligente de tickets (roteamento automático) em empresa de e-commerce",
+      "Trabalhou com integração de chatbots e IA para resolução de primeiro nível"
+    ],
+    "formacao": [
+      "MBA em Gestão de Produtos Digitais - Insper",
+      "Graduação em Ciência da Computação - UFRJ"
+    ],
+    "competencias_chave": ["automação de triagem", "roteamento de tickets", "IA aplicada a suporte", "priorização de backlog"]
+  },
+  {
+    "id": "4",
+    "nome": "Diego Faria",
+    "cargo_atual": "Líder de Recursos Humanos e Pessoas",
+    "experiencia": [
+      "7 anos em gestão de pessoas em áreas operacionais de alto volume",
+      "Conduziu programas de retenção e redução de turnover em equipes de atendimento",
+      "Especialista em carga de trabalho, burnout e clima organizacional"
+    ],
+    "formacao": [
+      "Pós-graduação em Gestão de Pessoas - FGV",
+      "Graduação em Psicologia Organizacional - Mackenzie"
+    ],
+    "competencias_chave": ["carga de trabalho da equipe", "turnover", "clima organizacional", "capacitação"]
+  }
+]

@@ -1,0 +1,16 @@
+# Tema claro Gedanken / GCertifica
+# Cores do logo: verde #00B040, navy #001060
+
+[theme]
+base = "light"
+primaryColor = "#00B040"
+backgroundColor = "#F4F7FB"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#001060"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

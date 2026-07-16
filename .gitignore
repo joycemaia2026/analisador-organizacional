@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+*.xlsx
+.DS_Store
+.streamlit/secrets.toml
+outputs/*
+!outputs/.gitkeep
+perfis/perfis.json
+*:Zone.Identifier
+*.Zone.Identifier
+node_modules/
+_legado_node/node_modules/
