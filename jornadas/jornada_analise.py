@@ -256,16 +256,24 @@ def render() -> None:
         n = len(_obter_atas_anexadas())
         st.success(
             f"Resumo da ata preenchido no pedido de ajuda "
-            f"({n} ata(s) anexada(s)). Revise Tomador/lentes e clique em Analisar."
+            f"({n} ata(s) anexada(s)). Revise Tomadores/lentes e clique em Analisar."
         )
 
     opcoes = {p["id"]: _rotulo_tomador(p) for p in perfis}
-    perfil_id = st.selectbox(
-        "Tomador de Decisão",
-        options=list(opcoes.keys()),
+    ids_todos = list(opcoes.keys())
+    perfil_ids = st.multiselect(
+        "Tomadores de Decisão",
+        options=ids_todos,
+        default=ids_todos,
         format_func=lambda pid: opcoes[pid],
+        help="Selecione uma ou várias pessoas. Por padrão, todas estão habilitadas.",
+        key="jornada_analise_tomadores",
     )
-    perfil = next(p for p in perfis if p["id"] == perfil_id)
+    perfis_sel = [p for p in perfis if p["id"] in perfil_ids]
+
+    if not perfis_sel:
+        st.warning("Selecione ao menos um Tomador de Decisão.")
+        return
 
     lentes_sel = st.multiselect(
         "Lentes de continuidade",
@@ -277,20 +285,21 @@ def render() -> None:
 
     with st.sidebar:
         st.divider()
-        st.subheader("Painel do Tomador")
-        st.markdown(f"**{perfil.get('nome', '')}**")
-        st.markdown(f"**Cargo:** {perfil.get('cargo') or '—'}")
-        st.markdown(f"**Empresa:** {perfil.get('empresa') or '—'}")
-        st.markdown(f"**Experiência:** {perfil.get('anos_experiencia', 0)} anos")
-        if perfil.get("especialidades"):
-            st.markdown("**Especialidades**")
-            st.write(", ".join(perfil["especialidades"]))
-        if perfil.get("formacao"):
-            st.markdown("**Formação**")
-            lista_bullets(perfil["formacao"])
-        if perfil.get("perfil_analitico"):
-            st.markdown("**Resumo**")
-            st.write(perfil["perfil_analitico"])
+        st.subheader(f"Painel dos Tomadores ({len(perfis_sel)})")
+        for perfil in perfis_sel:
+            with st.expander(_rotulo_tomador(perfil), expanded=len(perfis_sel) == 1):
+                st.markdown(f"**Cargo:** {perfil.get('cargo') or '—'}")
+                st.markdown(f"**Empresa:** {perfil.get('empresa') or '—'}")
+                st.markdown(f"**Experiência:** {perfil.get('anos_experiencia', 0)} anos")
+                if perfil.get("especialidades"):
+                    st.markdown("**Especialidades**")
+                    st.write(", ".join(perfil["especialidades"]))
+                if perfil.get("formacao"):
+                    st.markdown("**Formação**")
+                    lista_bullets(perfil["formacao"])
+                if perfil.get("perfil_analitico"):
+                    st.markdown("**Resumo**")
+                    st.write(perfil["perfil_analitico"])
         st.markdown("**Lentes:** " + ", ".join(LENTES[i]["nome"] for i in lentes_ativas))
         st.caption(f"2ª voz: {nome_especialista()}")
         st.caption(ESPECIALISTA_IA.get("perfil_analitico", "")[:180] + "…")
@@ -318,16 +327,34 @@ def render() -> None:
             st.error("OPENAI_API_KEY não configurada.")
             return
 
-        with st.spinner("Tomador analisando…"):
+        resultados: list[dict] = []
+        total = len(perfis_sel)
+        progresso = st.progress(0.0, text="Iniciando análises…")
+
+        for i, perfil in enumerate(perfis_sel):
+            nome = perfil.get("nome") or perfil.get("id") or f"Tomador {i+1}"
+            progresso.progress(
+                i / total,
+                text=f"Tomador {i+1}/{total}: {nome} analisando…",
+            )
             try:
                 analise_tomador = analisar_problema(
-                    perfil, problema, contexto, documentos=docs_bloco, lentes=lentes_ativas
+                    perfil,
+                    problema,
+                    contexto,
+                    documentos=docs_bloco,
+                    lentes=lentes_ativas,
                 )
             except Exception as exc:  # noqa: BLE001
-                st.error(f"Erro no Tomador: {exc}")
+                progresso.empty()
+                st.error(f"Erro no Tomador ({nome}): {exc}")
                 return
 
-        with st.spinner("Especialista IA avaliando…"):
+            progresso.progress(
+                (i + 0.5) / total,
+                text=f"Especialista IA avaliando a visão de {nome}…",
+            )
+            avaliacao = None
             try:
                 avaliacao = avaliar_com_especialista_ia(
                     perfil=perfil,
@@ -338,22 +365,36 @@ def render() -> None:
                     lentes=lentes_ativas,
                 )
             except Exception as exc:  # noqa: BLE001
-                st.error(f"Erro no Especialista: {exc}")
-                st.session_state["analise_tomador"] = analise_tomador
-                st.session_state["avaliacao_especialista"] = None
-                st.session_state["analise_comparativa"] = None
-                st.session_state["nome_tomador"] = perfil.get("nome")
-                st.session_state["problema_atual"] = problema
-                st.session_state["contexto_atual"] = contexto
-                st.session_state["documentos_atual"] = docs_bloco
-                st.session_state["nomes_docs"] = nomes_docs
-                st.session_state["lentes_atual"] = lentes_ativas
-                return
+                st.warning(f"Especialista indisponível para {nome}: {exc}")
 
-        st.session_state["analise_tomador"] = analise_tomador
-        st.session_state["avaliacao_especialista"] = avaliacao
+            resultados.append(
+                {
+                    "id": perfil.get("id"),
+                    "nome": nome,
+                    "analise": analise_tomador,
+                    "avaliacao": avaliacao,
+                }
+            )
+
+        progresso.progress(1.0, text="Análises concluídas.")
+        progresso.empty()
+
+        # Compatibilidade com jornada 3: bloco consolidado das vozes.
+        blocos_tomador = []
+        blocos_esp = []
+        for r in resultados:
+            blocos_tomador.append(f"### {r['nome']}\n\n{r['analise']}")
+            if r.get("avaliacao"):
+                blocos_esp.append(f"### Avaliação sobre {r['nome']}\n\n{r['avaliacao']}")
+
+        nomes = [r["nome"] for r in resultados]
+        st.session_state["analises_multiplas"] = resultados
+        st.session_state["analise_tomador"] = "\n\n".join(blocos_tomador)
+        st.session_state["avaliacao_especialista"] = (
+            "\n\n".join(blocos_esp) if blocos_esp else None
+        )
         st.session_state["analise_comparativa"] = None
-        st.session_state["nome_tomador"] = perfil.get("nome")
+        st.session_state["nome_tomador"] = " · ".join(nomes)
         st.session_state["problema_atual"] = problema
         st.session_state["contexto_atual"] = contexto
         st.session_state["documentos_atual"] = docs_bloco
@@ -367,6 +408,7 @@ def render() -> None:
     st.subheader("Resultado da análise")
     nome_tomador = st.session_state.get("nome_tomador", "Tomador")
     avaliacao = st.session_state.get("avaliacao_especialista")
+    multiplas = st.session_state.get("analises_multiplas") or []
 
     if st.button("Salvar análises (.docx)"):
         try:
@@ -397,19 +439,38 @@ def render() -> None:
                 ),
             )
 
-    st.markdown(
-        f'<div class="voz-tomador"><h3>Tomador de Decisão — {nome_tomador}</h3></div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(st.session_state["analise_tomador"])
-
-    st.markdown(
-        f'<div class="voz-especialista"><h3>{nome_especialista()}</h3></div>',
-        unsafe_allow_html=True,
-    )
-    if avaliacao:
-        st.markdown(avaliacao)
+    if multiplas:
+        st.caption(f"{len(multiplas)} Tomador(es): {nome_tomador}")
+        for r in multiplas:
+            st.markdown(
+                f'<div class="voz-tomador"><h3>Tomador de Decisão — {r["nome"]}</h3></div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(r["analise"])
+            st.markdown(
+                f'<div class="voz-especialista"><h3>{nome_especialista()} '
+                f'(sobre {r["nome"]})</h3></div>',
+                unsafe_allow_html=True,
+            )
+            if r.get("avaliacao"):
+                st.markdown(r["avaliacao"])
+            else:
+                st.warning(f"Avaliação do especialista indisponível para {r['nome']}.")
+            st.divider()
     else:
-        st.warning("Avaliação do especialista indisponível.")
+        st.markdown(
+            f'<div class="voz-tomador"><h3>Tomador de Decisão — {nome_tomador}</h3></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(st.session_state["analise_tomador"])
 
-    st.info("Para a comparação técnica das duas vozes, vá à jornada **3 · Análise Comparativa**.")
+        st.markdown(
+            f'<div class="voz-especialista"><h3>{nome_especialista()}</h3></div>',
+            unsafe_allow_html=True,
+        )
+        if avaliacao:
+            st.markdown(avaliacao)
+        else:
+            st.warning("Avaliação do especialista indisponível.")
+
+    st.info("Para a comparação técnica das vozes, vá à jornada **3 · Análise Comparativa**.")

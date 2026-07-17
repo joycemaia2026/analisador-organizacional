@@ -5,8 +5,8 @@
 | Produto | Analisador Organizacional |
 | Marca | Gedanken |
 | Slogan | Da ata à decisão — com a lente de quem lidera. |
-| Versão do documento | 1.0 |
-| Data | 2026-07-16 |
+| Versão do documento | 1.1 |
+| Data | 2026-07-17 |
 | Tipo | Especificação funcional e técnica |
 
 ---
@@ -20,10 +20,11 @@ Aplicação web que apoia a **continuidade organizacional** após reuniões e de
 1. **Registro** — transformar transcrição em ata estruturada  
 2. **Interpretação** — analisar o problema/atas sob o olhar de um Tomador de Decisão real da empresa  
 3. **Contraste** — confrontar a visão do Tomador com a de um Especialista Sênior em IA  
+4. **Comunicação** — reunir artefatos, enviar ao NotebookLM e gerar PPTX/infográfico  
 
 ### 1.2 Problema que resolve
 
-Reuniões geram informação dispersa; decisões e pendências se perdem; perfis de liderança não entram de forma sistemática na análise. O sistema formaliza o registro, ancora a análise no perfil profissional e faz um stress-test técnico da solução.
+Reuniões geram informação dispersa; decisões e pendências se perdem; perfis de liderança não entram de forma sistemática na análise. O sistema formaliza o registro, ancora a análise no perfil profissional, faz um stress-test técnico da solução e prepara material de comunicação executiva.
 
 ### 1.3 Usuários-alvo
 
@@ -36,7 +37,7 @@ Reuniões geram informação dispersa; decisões e pendências se perdem; perfis
 - A **transcrição/ata** é a fonte principal de fatos; inferências devem ser explícitas  
 - O **Tomador não “esteve” na reunião**: interpreta só o registro escrito  
 - Personas vêm da pasta `pessoas/` — a UI não recebe upload de currículo  
-- Fluxo em **três jornadas** claras e encadeáveis  
+- Fluxo em **quatro jornadas** claras e encadeáveis  
 
 ---
 
@@ -52,12 +53,15 @@ Reuniões geram informação dispersa; decisões e pendências se perdem; perfis
 - Análise comparativa entre as duas vozes  
 - Anexos múltiplos (atas/documentos) em `.txt`, `.md`, `.csv`, `.docx`  
 - Exportação DOCX e PDF (atas); DOCX (relatórios de análise)  
+- Persistência de atas em `outputs/ata_*.docx`  
+- Jornada Studio: `.docx` → NotebookLM (`notebooklm-py`, login Chrome a cada pedido) + fallback PPTX/infográfico locais  
 
 ### 2.2 Fora de escopo
 
 - Autenticação de usuários / multi-tenant  
 - Edição colaborativa em tempo real  
 - Integração com calendário ou Zoom/Teams  
+- API oficial / Enterprise do NotebookLM (usa `notebooklm-py` não oficial no consumer)  
 - Servidor FastAPI externo do projeto `ata_maker` (o módulo está embarcado)  
 - Upload de currículos pela interface  
 
@@ -234,6 +238,29 @@ Pré-condição: análises da jornada 2 presentes na sessão.
 
 ---
 
+### 4.4 Jornada 4 — Studio / NotebookLM
+
+**Objetivo:** reunir os `.docx` das jornadas 1–3, autenticar no NotebookLM consumer e gerar slide deck + infográfico (com download local); fallback OpenAI para PPTX/infográfico locais.
+
+| Aspecto | Especificação |
+|---------|----------------|
+| Entrada | `outputs/*.docx` com prefixos `ata_`, `analise_`, `comparativa_` |
+| NotebookLM | `notebooklm-py` (não oficial): login Chrome real a cada pedido → create notebook → add files → generate → download |
+| Saídas NLM | `outputs/nlm_slides_{timestamp}.pptx` e `outputs/nlm_infografico_{timestamp}.png` |
+| Fallback local | OpenAI + `python-pptx` / HTML+screenshot → `apresentacao_*.pptx`, `infografico_*.png` |
+
+Fluxo UI:
+
+1. Checklist dos `.docx` (exige ≥ 1)  
+2. **Gerar no NotebookLM** — abre Chrome; usuário faz login Google; pipeline automática  
+3. **Gerar PPTX local** / **Gerar infográfico local** — independentes do Google  
+
+Riscos: lib não oficial pode quebrar; quota Google; login exige display (WSLg).
+
+Sem `OPENAI_API_KEY`, exports locais avisam; NotebookLM não depende da OpenAI.
+
+---
+
 ## 5. Modelo de dados (resumido)
 
 ### 5.1 Currículo bruto (`pessoas/*.txt`)
@@ -250,11 +277,13 @@ Principais chaves:
 
 | Chave | Uso |
 |-------|-----|
-| `jornada_ativa` | `ata` \| `analise` \| `comparativa` |
+| `jornada_ativa` | `ata` \| `analise` \| `comparativa` \| `studio` |
 | `atas_anexadas` | lista `{nome, texto}` |
+| `ultimo_ata_docx` / `outputs_ata` | caminho(s) do `.docx` persistido da jornada 1 |
 | `jornada_analise_problema` | pedido de ajuda pré-preenchido |
 | `analise_tomador` / `avaliacao_especialista` | saídas da jornada 2 |
 | `analise_comparativa` | saída da jornada 3 |
+| `studio_pptx` / `studio_infografico` | caminhos dos artefatos da jornada 4 |
 | `qa_historico` | perguntas rápidas da jornada 1 |
 
 ---
@@ -265,14 +294,18 @@ Principais chaves:
 
 | Variável | Obrigatória | Default | Descrição |
 |----------|-------------|---------|-----------|
-| `OPENAI_API_KEY` | Sim | — | Chave da API OpenAI |
+| `OPENAI_API_KEY` | Sim (LLM) | — | Chave da API OpenAI |
 | `OPENAI_MODEL` | Não | `gpt-4o-mini` | Modelo de chat |
+| `NOTEBOOKLM_STATE_PATH` | Não | `.notebooklm/storage_state.json` | Sessão notebooklm-py |
+| `NOTEBOOKLM_CHROME_PATH` | Não | extract local | Chrome Linux para login |
 
 Arquivo: `.env` (modelo em `.env.example`).
 
 ### 6.2 Dependências principais
 
-`streamlit`, `openai`, `python-docx`, `fpdf2`, `pandas`, `openpyxl`, `python-dotenv`.
+`streamlit`, `openai`, `python-docx`, `fpdf2`, `pandas`, `openpyxl`, `python-dotenv`, `playwright`, `python-pptx`, `notebooklm-py`.
+
+Browsers: `python -m playwright install chromium`; Chrome Linux via `./scripts/install_chrome_wsl.sh`.
 
 ---
 
@@ -288,6 +321,7 @@ jornadas/
   jornada_ata.py
   jornada_analise.py
   jornada_comparativa.py
+  jornada_studio.py
 core/
   analisador.py
   leitor_perfis.py
@@ -300,6 +334,9 @@ core/
   openai_client.py
   export_docx.py
   export_pdf.py
+  export_pptx.py
+  export_infografico.py
+  outputs_collector.py
   utils.py
 modulos/ata_maker/
   engine.py
@@ -307,9 +344,15 @@ modulos/ata_maker/
   nlp.py
   perguntas.py
   prompts/default_prompt.txt
+modulos/notebooklm/
+  auth.py              # login Chrome via notebooklm CLI
+  pipeline.py          # create / add / generate / download
+  client.py
+  browser.py           # Chrome local + syslibs
 pessoas/               # Currículos .txt
 perfis/perfis.json     # Cache de perfis
-outputs/               # Relatórios gerados
+outputs/               # Relatórios .docx / pptx / png
+.notebooklm/           # Sessão Playwright (gitignored)
 assets/                # Logo Gedanken
 ```
 
@@ -320,7 +363,7 @@ assets/                # Logo Gedanken
 | ID | Requisito | Prioridade |
 |----|-----------|------------|
 | RF-01 | Exibir marca (título + slogan) acima da navegação | Alta |
-| RF-02 | Navegar entre as 3 jornadas com botões no topo | Alta |
+| RF-02 | Navegar entre as 4 jornadas com botões no topo | Alta |
 | RF-03 | Gerar ata em modo prompt ou completo | Alta |
 | RF-04 | Selecionar especialistas sem pré-seleção | Alta |
 | RF-05 | Incluir NLP opcional nos dois modos de ata | Alta |
@@ -333,6 +376,9 @@ assets/                # Logo Gedanken
 | RF-12 | Analisar com Tomador + lentes + Especialista IA | Alta |
 | RF-13 | Gerar análise comparativa das duas vozes | Alta |
 | RF-14 | Exportar relatórios de análise em DOCX | Média |
+| RF-15 | Selecionar todos / limpar especialistas na jornada 1 | Alta |
+| RF-16 | Persistir atas em `outputs/ata_*.docx` | Alta |
+| RF-17 | Jornada Studio: NotebookLM via notebooklm-py (login a cada pedido) + fallback local | Alta |
 
 ---
 
@@ -371,15 +417,19 @@ assets/                # Logo Gedanken
 
 ## 11. Critérios de aceite (smoke)
 
-- [ ] App sobe com `./rodar.sh` e abre a marca + 3 jornadas  
+- [ ] App sobe com `./rodar.sh` e abre a marca + 4 jornadas  
 - [ ] Ata modo prompt gera texto e permite DOCX/PDF  
-- [ ] Ata modo completo exige especialista selecionado; NLP pode ir sozinho no prompt  
+- [ ] Ata modo completo: **Selecionar todos** / **Limpar** nos especialistas  
+- [ ] Ata gerada grava `outputs/ata_*.docx`  
 - [ ] NLP, quando ativo, aparece no final da ata  
 - [ ] Pergunta rápida responde com base na transcrição  
 - [ ] Novo `.txt` em `pessoas/` é detectado por **Adicionar personas**  
 - [ ] **Atualizar pessoas** regenera perfis existentes  
 - [ ] Análise com ata anexada roda Tomador + Especialista  
 - [ ] Comparativa só libera com análises prévias  
+- [ ] Jornada 4: **Gerar no NotebookLM** abre Chrome, após login gera slides/infográfico  
+- [ ] PPTX e infográfico **locais** geram sem depender do NotebookLM  
+- [ ] Sem `OPENAI_API_KEY`, exports locais avisam; NotebookLM segue disponível  
 - [ ] Sem `OPENAI_API_KEY`, fluxos LLM exibem aviso claro  
 
 ---

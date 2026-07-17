@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
 
 from core.ata_maker_client import check_health, gerar_ata_de_transcricao, listar_especialistas
 from core.documentos import TIPOS_UPLOAD, anexar_documento_sessao, extrair_texto_arquivo
-from core.export_docx import markdown_para_docx_bytes
+from core.export_docx import markdown_para_docx_bytes, salvar_markdown_como_docx
 from core.export_pdf import markdown_para_pdf_bytes
 from core.openai_client import get_api_key
+from core.utils import OUTPUTS_DIR, ensure_dirs
 from jornadas.comum import render_cabecalho
 from modulos.ata_maker.perguntas import SUGESTOES, responder_pergunta_transcricao
+
+
+def _stem_ata(nome: str) -> str:
+    return Path(nome or "ata").stem
 
 
 def _extrair_resumo_ata(texto: str, *, max_chars: int = 1200) -> str:
@@ -48,11 +54,24 @@ def _atas_sessao() -> list[dict]:
     return []
 
 
-def _registrar_ata(nome: str, texto: str) -> None:
+def _registrar_ata(nome: str, texto: str) -> Path | None:
     atas = anexar_documento_sessao(_atas_sessao(), nome=nome, texto=texto)
     st.session_state["atas_anexadas"] = atas
     st.session_state["ata_gerada_texto"] = texto
     st.session_state["ata_gerada_nome"] = nome
+
+    # Persiste .docx em outputs/ para a jornada 4.
+    ensure_dirs()
+    stem = _stem_ata(nome)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    caminho = OUTPUTS_DIR / f"ata_{stem}_{stamp}.docx"
+    titulo = stem.replace("_", " ").title()
+    salvar_markdown_como_docx(caminho, titulo, texto or "")
+    st.session_state["ultimo_ata_docx"] = str(caminho)
+    paths = list(st.session_state.get("outputs_ata") or [])
+    paths.append(str(caminho))
+    st.session_state["outputs_ata"] = paths
+    return caminho
 
 
 def _enviar_para_analise(ata_texto: str, nome_arquivo: str) -> None:
@@ -148,10 +167,6 @@ def _painel_perguntas_rapidas(transcricao: str, *, online: bool) -> None:
                 expanded=(i == 1),
             ):
                 st.markdown(item["resposta"])
-
-
-def _stem_ata(nome: str) -> str:
-    return Path(nome or "ata").stem
 
 
 def _botoes_download_ata(nome: str, texto: str, *, key_prefix: str) -> None:
@@ -254,14 +269,26 @@ def render() -> None:
     if modo_ata == "full":
         st.markdown("#### Tipos de especialistas")
         opcoes_esp = listar_especialistas()
+        ids_esp = [k for k, _ in opcoes_esp]
         rotulos = {k: label for k, label in opcoes_esp}
+
+        c_sel, c_limpar = st.columns(2)
+        with c_sel:
+            if st.button("Selecionar todos", key="btn_esp_todos", use_container_width=True):
+                st.session_state["jornada_ata_especialistas_v2"] = list(ids_esp)
+                st.rerun()
+        with c_limpar:
+            if st.button("Limpar", key="btn_esp_limpar", use_container_width=True):
+                st.session_state["jornada_ata_especialistas_v2"] = []
+                st.rerun()
+
         especialistas_sel = st.multiselect(
             "Selecione um ou mais especialistas",
-            options=[k for k, _ in opcoes_esp],
+            options=ids_esp,
             default=[],
             format_func=lambda k: rotulos.get(k, k),
             key="jornada_ata_especialistas_v2",
-            help="Escolha quais especialistas deseja usar. Nenhum vem pré-selecionado.",
+            help="Use Selecionar todos ou escolha individualmente.",
         )
         if not especialistas_sel:
             st.warning("Selecione ao menos um especialista para a análise completa.")
@@ -316,8 +343,8 @@ def render() -> None:
                     _enviar_para_analise(ata.texto, nome_ata)
                 else:
                     st.success(
-                        "Ata gerada e anexada. Use o botão abaixo ou a jornada "
-                        "**2 · Análise Organizacional**."
+                        "Ata gerada, anexada e salva em `outputs/`. "
+                        "Use o botão abaixo ou a jornada **2 · Análise Organizacional**."
                     )
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Falha ao gerar ata: {exc}")

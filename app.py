@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from core.utils import LOGO_PATH
-from jornadas import jornada_analise, jornada_ata, jornada_comparativa
+from jornadas import jornada_analise, jornada_ata, jornada_comparativa, jornada_studio
 from jornadas.comum import aplicar_tema, selecionar_jornada
 
 
@@ -25,6 +25,8 @@ def main() -> None:
         jornada_ata.render()
     elif jornada == "comparativa":
         jornada_comparativa.render()
+    elif jornada == "studio":
+        jornada_studio.render()
     else:
         jornada_analise.render()
 

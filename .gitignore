@@ -12,3 +12,6 @@ perfis/perfis.json
 *.Zone.Identifier
 node_modules/
 _legado_node/node_modules/
+.notebooklm/
+cookies.txt
+*.storage_state.json

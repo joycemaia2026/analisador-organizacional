@@ -7,11 +7,13 @@ from pathlib import Path
 import streamlit as st
 
 from core.utils import LOGO_PATH, ensure_dirs
+from core.outputs_collector import contar_docx_jornadas
 
 JORNADAS = {
     "ata": "1 · Gerar Ata",
     "analise": "2 · Análise Organizacional",
     "comparativa": "3 · Análise Comparativa",
+    "studio": "4 · Studio / NotebookLM",
 }
 
 INFO_JORNADAS = {
@@ -52,13 +54,13 @@ INFO_JORNADAS = {
             "Técnico (viabilidade) · Financista (ROI)."
         ),
         "passos": [
-            "Escolha Tomador e lentes",
+            "Escolha um ou mais Tomadores e as lentes",
             "Problema e/ou várias atas (.txt/.csv/.docx)",
-            "Analisar (diagnóstico + plano)",
+            "Analisar (diagnóstico + plano por pessoa)",
             "Revise riscos e próximos passos",
         ],
-        "entrada": "Problema + atas + perfil + lentes",
-        "saida": "Diagnóstico, plano e avaliação crítica",
+        "entrada": "Problema + atas + perfis + lentes",
+        "saida": "Diagnóstico, plano e avaliação crítica (por Tomador)",
     },
     "comparativa": {
         "titulo": "Análise Comparativa",
@@ -81,6 +83,28 @@ INFO_JORNADAS = {
         ],
         "entrada": "Voz do Tomador + voz do Especialista",
         "saida": "Síntese comparativa e conceitos",
+    },
+    "studio": {
+        "titulo": "Studio / NotebookLM",
+        "objetivo": (
+            "Reunir os .docx das jornadas 1–3, enviar ao NotebookLM e gerar "
+            "apresentação PPTX e infográfico para comunicação executiva."
+        ),
+        "fundamento": (
+            "Síntese visual · storytelling de decisão · grounding em fontes "
+            "(NotebookLM)."
+        ),
+        "lentes": (
+            "Seleção de artefatos · upload de fontes · PPTX · infográfico."
+        ),
+        "passos": [
+            "Selecione os .docx gerados nas jornadas 1–3",
+            "Clique em Gerar no NotebookLM e faça login Google no Chrome",
+            "Aguarde upload + slide deck + infográfico",
+            "Ou use PPTX/infográfico locais (OpenAI) sem Google",
+        ],
+        "entrada": ".docx de ata, análise e comparativa em outputs/",
+        "saida": "Slide deck + infográfico NotebookLM (e/ou locais)",
     },
 }
 
@@ -256,6 +280,7 @@ def _barra_jornadas_topo() -> str:
 1. **Gerar Ata** — transforma a transcrição em ata estruturada; permite perguntas rápidas, escolha de especialistas e análise NLP.
 2. **Análise Organizacional** — o Tomador de Decisão interpreta o problema e as atas; o Especialista IA faz o stress-test da visão.
 3. **Análise Comparativa** — confronta as duas vozes e sintetiza convergências, divergências, gaps e conceitos.
+4. **Studio / NotebookLM** — envia os .docx ao NotebookLM e gera PPTX + infográfico.
 """
     )
     st.markdown("</div>", unsafe_allow_html=True)
@@ -296,8 +321,10 @@ def selecionar_jornada() -> str:
         st.caption("Status do fluxo")
         tem_analise = bool(st.session_state.get("analise_tomador"))
         tem_comp = bool(st.session_state.get("analise_comparativa"))
+
         st.markdown(f"- Atas anexadas: {len(atas)}")
         st.markdown(f"- Análise pronta: {'sim' if tem_analise else 'não'}")
         st.markdown(f"- Comparativa: {'sim' if tem_comp else 'não'}")
+        st.markdown(f"- .docx em outputs (1–3): {contar_docx_jornadas()}")
 
     return jornada
