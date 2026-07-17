@@ -13,7 +13,8 @@ JORNADAS = {
     "ata": "1 · Gerar Ata",
     "analise": "2 · Análise Organizacional",
     "comparativa": "3 · Análise Comparativa",
-    "studio": "4 · Studio / NotebookLM",
+    "resumo": "4 · Resumo",
+    "studio": "5 · Studio / NotebookLM",
 }
 
 INFO_JORNADAS = {
@@ -84,10 +85,31 @@ INFO_JORNADAS = {
         "entrada": "Voz do Tomador + voz do Especialista",
         "saida": "Síntese comparativa e conceitos",
     },
+    "resumo": {
+        "titulo": "Resumo",
+        "objetivo": (
+            "Consolidar ata, personas e Especialista IA em um documento "
+            "enxuto — problema e o que fazer no topo, com fonte em cada seção."
+        ),
+        "fundamento": (
+            "Síntese executiva · rastreabilidade · continuidade organizacional."
+        ),
+        "lentes": (
+            "Problema · ações · registro da ata · vozes das personas · stress-test IA."
+        ),
+        "passos": [
+            "Confira o material das jornadas 1–2 (e 3 se houver)",
+            "Gere o resumo consolidado",
+            "Revise problema e o que fazer",
+            "Baixe o .docx se precisar",
+        ],
+        "entrada": "Ata + análise do Tomador + Especialista IA",
+        "saida": "Resumo markdown/DOCX com fontes",
+    },
     "studio": {
         "titulo": "Studio / NotebookLM",
         "objetivo": (
-            "Reunir os .docx das jornadas 1–3, enviar ao NotebookLM e gerar "
+            "Reunir os .docx das jornadas anteriores, enviar ao NotebookLM e gerar "
             "apresentação PPTX e infográfico para comunicação executiva."
         ),
         "fundamento": (
@@ -98,12 +120,12 @@ INFO_JORNADAS = {
             "Seleção de artefatos · upload de fontes · PPTX · infográfico."
         ),
         "passos": [
-            "Selecione os .docx gerados nas jornadas 1–3",
+            "Selecione os .docx gerados nas jornadas anteriores",
             "Clique em Gerar no NotebookLM e faça login Google no Chrome",
             "Aguarde upload + slide deck + infográfico",
             "Ou use PPTX/infográfico locais (OpenAI) sem Google",
         ],
-        "entrada": ".docx de ata, análise e comparativa em outputs/",
+        "entrada": ".docx de ata, análise, comparativa e resumo em outputs/",
         "saida": "Slide deck + infográfico NotebookLM (e/ou locais)",
     },
 }
@@ -280,7 +302,8 @@ def _barra_jornadas_topo() -> str:
 1. **Gerar Ata** — transforma a transcrição em ata estruturada; permite perguntas rápidas, escolha de especialistas e análise NLP.
 2. **Análise Organizacional** — o Tomador de Decisão interpreta o problema e as atas; o Especialista IA faz o stress-test da visão.
 3. **Análise Comparativa** — confronta as duas vozes e sintetiza convergências, divergências, gaps e conceitos.
-4. **Studio / NotebookLM** — envia os .docx ao NotebookLM e gera PPTX + infográfico.
+4. **Resumo** — consolida ata, personas e Especialista IA com foco em problema e o que fazer.
+5. **Studio / NotebookLM** — envia os .docx ao NotebookLM e gera PPTX + infográfico.
 """
     )
     st.markdown("</div>", unsafe_allow_html=True)
@@ -321,10 +344,12 @@ def selecionar_jornada() -> str:
         st.caption("Status do fluxo")
         tem_analise = bool(st.session_state.get("analise_tomador"))
         tem_comp = bool(st.session_state.get("analise_comparativa"))
+        tem_resumo = bool(st.session_state.get("resumo_consolidado"))
 
         st.markdown(f"- Atas anexadas: {len(atas)}")
         st.markdown(f"- Análise pronta: {'sim' if tem_analise else 'não'}")
         st.markdown(f"- Comparativa: {'sim' if tem_comp else 'não'}")
+        st.markdown(f"- Resumo: {'sim' if tem_resumo else 'não'}")
         st.markdown(f"- .docx em outputs (1–3): {contar_docx_jornadas()}")
 
     return jornada

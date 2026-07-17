@@ -1,4 +1,4 @@
-"""Jornada 4 — Studio: NotebookLM (login + produtos) + PPTX/infográfico locais."""
+"""Jornada 5 — Studio: NotebookLM (login + produtos) + PPTX/infográfico locais."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def render() -> None:
 
     opcoes = {str(a.caminho): a.rotulo for a in artefatos}
     selecionados = st.multiselect(
-        "Documentos das jornadas 1–3",
+        "Documentos das jornadas anteriores",
         options=list(opcoes.keys()),
         default=list(opcoes.keys()),
         format_func=lambda p: opcoes[p],

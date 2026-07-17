@@ -1,6 +1,6 @@
 # Analisador Organizacional
 
-Aplicação Streamlit (Gedanken) que transforma currículos em perfis analíticos e conduz o fluxo **ata → análise → comparativa → studio**.
+Aplicação Streamlit (Gedanken) que transforma currículos em perfis analíticos e conduz o fluxo **ata → análise → comparativa → resumo → studio**.
 
 Documentação completa: ver [`ESPECIFICACAO.md`](ESPECIFICACAO.md).
 
@@ -10,14 +10,15 @@ Documentação completa: ver [`ESPECIFICACAO.md`](ESPECIFICACAO.md).
 2. **Gerar Ata** — transcrição → ata (especialistas, NLP, perguntas rápidas; DOCX/PDF em `outputs/`)
 3. **Análise Organizacional** — um ou mais Tomadores + lentes + Especialista IA
 4. **Análise Comparativa** — contraste técnico entre as vozes
-5. **Studio / NotebookLM** — login Google no Chrome → sobe `.docx` → slide deck + infográfico (via `notebooklm-py`); fallback PPTX/infográfico locais (OpenAI)
+5. **Resumo** — consolida ata + personas + Especialista IA (problema e o que fazer no topo)
+6. **Studio / NotebookLM** — login Google → slide deck + infográfico; fallback PPTX/infográfico locais
 
 ## Pré-requisitos
 
 - Python 3.10+
-- Chave da API OpenAI (para jornadas 1–3 e exports locais)
-- Conta Google (NotebookLM consumer na jornada 4)
-- Display gráfico no WSL (WSLg) para o login Chrome
+- Chave da API OpenAI
+- Conta Google (opcional; só para NotebookLM na jornada 5)
+- Display gráfico no WSL (WSLg) se for usar NotebookLM
 
 ## Setup
 
@@ -42,41 +43,23 @@ cp .env.example .env
 
 A interface abre em `http://localhost:8501`.
 
-Personas: coloque `.txt` em `pessoas/` e use **Adicionar personas** / **Atualizar pessoas** na jornada 2 (sem upload pela tela).
-
 ## Estrutura
 
 ```text
 app.py                 # Interface Streamlit
-ESPECIFICACAO.md       # Especificação funcional e técnica
-jornadas/              # UI das 4 jornadas
-core/                  # Análise, perfis, documentos, export
+jornadas/              # UI das 5 jornadas
+core/                  # Análise, perfis, documentos, resumo, export
 modulos/ata_maker/     # Motor de ata embarcado
-modulos/notebooklm/    # notebooklm-py: login + pipeline de produtos
-pessoas/               # Currículos brutos (.txt)
-perfis/                # perfis.json gerado
+modulos/notebooklm/    # notebooklm-py (jornada 5)
 outputs/               # Relatórios .docx / pptx / png
-assets/                # Logo Gedanken
-.notebooklm/           # Chrome local, syslibs, storage (gitignored)
-scripts/               # install_chrome_wsl.sh, install_playwright_deps.sh
 ```
-
-## Variáveis de ambiente
-
-| Variável | Descrição |
-|----------|-----------|
-| `OPENAI_API_KEY` | Chave da OpenAI (LLM / exports locais) |
-| `OPENAI_MODEL` | Modelo (default: `gpt-4o-mini`) |
-| `NOTEBOOKLM_STATE_PATH` | storage_state do notebooklm-py |
-| `NOTEBOOKLM_CHROME_PATH` | Chrome Linux (opcional; senão usa extract local) |
-
-Na jornada 4, **Gerar no NotebookLM** abre o Chrome para login a cada pedido; em seguida sobe as fontes e baixa slide deck + infográfico. A lib é **não oficial** e pode quebrar se o Google mudar endpoints.
 
 ## Jornadas
 
-1. **Gerar Ata** — módulo `modulos/ata_maker` (embarcado)
-2. **Análise Organizacional** — Tomador(es) + Especialista IA + lentes
-3. **Análise Comparativa** — contraste entre as vozes
-4. **Studio / NotebookLM** — produtos NotebookLM + fallback local OpenAI
+1. **Gerar Ata**
+2. **Análise Organizacional**
+3. **Análise Comparativa**
+4. **Resumo** — consolidação com fontes
+5. **Studio / NotebookLM** — comunicação visual
 
 A ata gerada na jornada 1 entra automaticamente nos documentos da jornada 2 e é persistida em `outputs/ata_*.docx`.

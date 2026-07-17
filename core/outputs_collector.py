@@ -23,6 +23,8 @@ def _classificar(nome: str) -> str:
         return "analise"
     if n.startswith("comparativa_"):
         return "comparativa"
+    if n.startswith("resumo_"):
+        return "resumo"
     if n.startswith("apresentacao_"):
         return "apresentacao"
     if n.startswith("infografico_"):
@@ -32,9 +34,9 @@ def _classificar(nome: str) -> str:
 
 def listar_docx_jornadas(
     *,
-    categorias: tuple[str, ...] = ("ata", "analise", "comparativa"),
+    categorias: tuple[str, ...] = ("ata", "analise", "comparativa", "resumo"),
 ) -> list[ArtefatoOutput]:
-    """Lista .docx das jornadas 1–3 (por prefixo), mais recentes primeiro."""
+    """Lista .docx das jornadas (por prefixo), mais recentes primeiro."""
     ensure_dirs()
     itens: list[ArtefatoOutput] = []
     for path in OUTPUTS_DIR.glob("*.docx"):
