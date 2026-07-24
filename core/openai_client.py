@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
@@ -22,6 +23,10 @@ def get_api_key() -> str | None:
 
 def get_model() -> str:
     return os.getenv("OPENAI_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+
+
+def get_image_model() -> str:
+    return os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1").strip() or "gpt-image-1"
 
 
 def get_client() -> OpenAI:
@@ -53,3 +58,46 @@ def chat_completion(
     if not content:
         raise RuntimeError("A API da OpenAI retornou resposta vazia.")
     return content.strip()
+
+
+def gerar_imagem_png(
+    prompt: str,
+    *,
+    destino: Path | None = None,
+    size: str = "1536x1024",
+) -> bytes:
+    """Gera PNG via Images API (ChatGPT / gpt-image / DALL·E)."""
+    import base64
+
+    client = get_client()
+    model = get_image_model()
+    kwargs: dict[str, Any] = {
+        "model": model,
+        "prompt": prompt[:32000],
+        "n": 1,
+    }
+    # dall-e-3: 1792x1024; gpt-image-*: 1536x1024 (landscape ~16:9)
+    if model.startswith("dall-e"):
+        kwargs["size"] = "1792x1024"
+        kwargs["quality"] = "hd"
+        kwargs["response_format"] = "b64_json"
+    else:
+        kwargs["size"] = size
+
+    response = client.images.generate(**kwargs)
+    item = response.data[0]
+    b64 = getattr(item, "b64_json", None)
+    if b64:
+        raw = base64.b64decode(b64)
+    elif getattr(item, "url", None):
+        import urllib.request
+
+        with urllib.request.urlopen(item.url, timeout=120) as resp:  # noqa: S310
+            raw = resp.read()
+    else:
+        raise RuntimeError("Images API não retornou imagem (b64 nem URL).")
+
+    if destino is not None:
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_bytes(raw)
+    return raw

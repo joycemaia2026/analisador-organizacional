@@ -10,6 +10,7 @@ import streamlit as st
 
 from core.ata_maker_client import check_health, gerar_ata_de_transcricao, listar_especialistas
 from core.documentos import TIPOS_UPLOAD, anexar_documento_sessao, extrair_texto_arquivo
+from core.especificacoes_llm import campo_especificacoes_llm
 from core.export_docx import markdown_para_docx_bytes, salvar_markdown_como_docx
 from core.export_pdf import markdown_para_pdf_bytes
 from core.openai_client import get_api_key
@@ -74,8 +75,8 @@ def _registrar_ata(nome: str, texto: str) -> Path | None:
     return caminho
 
 
-def _enviar_para_analise(ata_texto: str, nome_arquivo: str) -> None:
-    """Anexa a ata, preenche o pedido de ajuda e abre a Análise."""
+def _preparar_para_analise(ata_texto: str, nome_arquivo: str) -> None:
+    """Anexa a ata e preenche o pedido de ajuda — sem trocar de jornada."""
     _registrar_ata(nome_arquivo, ata_texto)
     resumo = _extrair_resumo_ata(ata_texto)
     n = len(_atas_sessao())
@@ -87,6 +88,11 @@ def _enviar_para_analise(ata_texto: str, nome_arquivo: str) -> None:
         prefixo + f"**Resumo da última ata ({nome_arquivo}):**\n{resumo}"
     )
     st.session_state["veio_da_ata"] = True
+
+
+def _enviar_para_analise(ata_texto: str, nome_arquivo: str) -> None:
+    """Prepara a Análise e abre a jornada 2 (ação explícita do usuário)."""
+    _preparar_para_analise(ata_texto, nome_arquivo)
     st.session_state["jornada_ativa"] = "analise"
     st.rerun()
 
@@ -301,11 +307,13 @@ def render() -> None:
         help="Disponível no prompt principal e na análise completa.",
     )
 
-    ir_auto = st.checkbox(
-        "Após gerar, ir automaticamente para Análise Organizacional",
-        value=True,
-        key="ata_auto_analise",
+    preparar_analise = st.checkbox(
+        "Após gerar, preparar Análise Organizacional (anexar ata e preencher pedido — sem mudar de jornada)",
+        value=False,
+        key="ata_preparar_analise",
     )
+
+    especificacoes = campo_especificacoes_llm("jornada_ata_especificacoes")
 
     gerar_ok = health.online and (modo_ata != "full" or bool(especialistas_sel))
     if st.button(
@@ -333,19 +341,23 @@ def render() -> None:
                     modo=modo_ata,
                     personas=especialistas_sel if modo_ata == "full" else None,
                     incluir_nlp=incluir_nlp,
+                    especificacoes=especificacoes,
                 )
                 nome_ata = f"ata_gerada_{Path(nome_fonte).stem}.md"
-                _registrar_ata(nome_ata, ata.texto)
-                if ata.erros:
-                    st.warning("Avisos: " + "; ".join(ata.erros))
-
-                if ir_auto:
-                    _enviar_para_analise(ata.texto, nome_ata)
+                if preparar_analise:
+                    _preparar_para_analise(ata.texto, nome_ata)
+                    st.success(
+                        "Ata gerada e preparada para a Análise "
+                        "(permanece nesta jornada). Use **2 · Análise Organizacional** quando quiser."
+                    )
                 else:
+                    _registrar_ata(nome_ata, ata.texto)
                     st.success(
                         "Ata gerada, anexada e salva em `outputs/`. "
                         "Use o botão abaixo ou a jornada **2 · Análise Organizacional**."
                     )
+                if ata.erros:
+                    st.warning("Avisos: " + "; ".join(ata.erros))
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Falha ao gerar ata: {exc}")
 

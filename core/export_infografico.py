@@ -1,4 +1,4 @@
-"""Geração de infográfico (HTML + screenshot PNG via Playwright)."""
+"""Geração de infográfico via ChatGPT (prompt visual + Images API)."""
 
 from __future__ import annotations
 
@@ -10,20 +10,12 @@ from pathlib import Path
 from typing import Any
 
 from core.documentos import extrair_texto_arquivo
-from core.openai_client import chat_completion, get_api_key
+from core.openai_client import chat_completion, gerar_imagem_png, get_api_key
+from core.prompt_infografico import (
+    SYSTEM_EXTRAIR_CONTEUDO,
+    montar_prompt_infografico,
+)
 from core.utils import OUTPUTS_DIR, ensure_dirs
-
-SYSTEM_INFO = """Você extrai insights para um infográfico executivo em português do Brasil.
-Responda SOMENTE JSON válido:
-{
-  "titulo": "...",
-  "subtitulo": "...",
-  "blocos": [
-    {"rotulo": "...", "texto": "..."}
-  ],
-  "destaque": "..."
-}
-Regras: 4 a 6 blocos; textos curtos; não invente fora das fontes."""
 
 
 def _extrair_json(texto: str) -> dict[str, Any]:
@@ -54,19 +46,27 @@ def _texto_fontes(caminhos: list[Path], *, max_chars: int = 50000) -> str:
     return "\n\n".join(partes)
 
 
-def gerar_estrutura_infografico(caminhos: list[Path]) -> dict[str, Any]:
+def gerar_estrutura_infografico(
+    caminhos: list[Path], especificacoes: str = ""
+) -> dict[str, Any]:
+    """Extrai conteúdo estruturado das fontes (para preencher o prompt visual)."""
     if not get_api_key():
         raise RuntimeError("OPENAI_API_KEY não configurada.")
+    from core.especificacoes_llm import anexar_especificacoes
+
     fontes = _texto_fontes(caminhos)
     if not fontes.strip():
         raise ValueError("Fontes vazias.")
+    user = anexar_especificacoes(
+        "Com base nas fontes abaixo, preencha o JSON do infográfico "
+        "(arquitetura de produto / análise organizacional).\n\n"
+        f"{fontes}",
+        especificacoes,
+    )
     resp = chat_completion(
         [
-            {"role": "system", "content": SYSTEM_INFO},
-            {
-                "role": "user",
-                "content": f"Com base nas fontes, monte o infográfico.\n\n{fontes}",
-            },
+            {"role": "system", "content": SYSTEM_EXTRAIR_CONTEUDO},
+            {"role": "user", "content": user},
         ],
         temperature=0.3,
         response_format={"type": "json_object"},
@@ -74,18 +74,10 @@ def gerar_estrutura_infografico(caminhos: list[Path]) -> dict[str, Any]:
     return _extrair_json(resp)
 
 
-def montar_html_infografico(dados: dict[str, Any]) -> str:
+def montar_html_preview(dados: dict[str, Any], prompt_usado: str) -> str:
+    """HTML leve com o conteúdo + prompt (referência; a entrega principal é o PNG)."""
     titulo = html.escape(str(dados.get("titulo") or "Infográfico"))
-    sub = html.escape(str(dados.get("subtitulo") or ""))
-    destaque = html.escape(str(dados.get("destaque") or ""))
-    cards = []
-    for b in dados.get("blocos") or []:
-        rotulo = html.escape(str(b.get("rotulo") or ""))
-        texto = html.escape(str(b.get("texto") or ""))
-        cards.append(
-            f'<div class="card"><h3>{rotulo}</h3><p>{texto}</p></div>'
-        )
-    cards_html = "\n".join(cards)
+    prompt_esc = html.escape(prompt_usado)
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -93,69 +85,55 @@ def montar_html_infografico(dados: dict[str, Any]) -> str:
 <title>{titulo}</title>
 <style>
   body {{
-    margin: 0; padding: 40px;
-    font-family: Georgia, "Times New Roman", serif;
-    background: linear-gradient(160deg, #F4F7FB 0%, #E8F5EE 100%);
-    color: #001060;
-    width: 1200px;
+    margin: 0; padding: 32px;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: #F4F9FB; color: #001060;
+    max-width: 960px;
   }}
-  h1 {{ font-size: 42px; margin: 0 0 8px; color: #001060; }}
-  .sub {{ font-size: 20px; color: #003080; margin-bottom: 28px; }}
-  .destaque {{
-    background: #00B040; color: white; padding: 16px 22px;
-    border-radius: 10px; font-size: 18px; margin-bottom: 28px;
+  h1 {{ font-size: 28px; margin: 0 0 12px; }}
+  pre {{
+    white-space: pre-wrap; background: #fff; border: 1px solid #D7E3F0;
+    border-radius: 12px; padding: 16px; font-size: 12px; line-height: 1.45;
   }}
-  .grid {{
-    display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
-  }}
-  .card {{
-    background: white; border: 1px solid #D7E3F0; border-radius: 12px;
-    padding: 18px 20px; min-height: 120px;
-  }}
-  .card h3 {{ margin: 0 0 8px; color: #00B040; font-size: 18px; }}
-  .card p {{ margin: 0; font-size: 16px; line-height: 1.4; }}
-  .brand {{ margin-top: 28px; font-size: 14px; color: #0050A0; }}
+  .brand {{ margin-top: 20px; font-size: 13px; color: #0050A0; }}
 </style>
 </head>
 <body>
   <h1>{titulo}</h1>
-  <div class="sub">{sub}</div>
-  {f'<div class="destaque">{destaque}</div>' if destaque else ''}
-  <div class="grid">
-    {cards_html}
-  </div>
+  <p>Prompt enviado ao ChatGPT Images (16:9 corporativo).</p>
+  <pre>{prompt_esc}</pre>
   <div class="brand">Gedanken · Analisador Organizacional</div>
 </body>
 </html>
 """
 
 
-def html_para_png(html_path: Path, png_path: Path) -> Path:
-    from playwright.sync_api import sync_playwright
+def gerar_infografico(
+    caminhos: list[Path], especificacoes: str = ""
+) -> tuple[Path, Path]:
+    """
+    1) ChatGPT extrai conteúdo das fontes
+    2) Monta o prompt visual corporativo 16:9
+    3) Images API gera o PNG
 
-    from modulos.notebooklm.auth import mensagem_erro_browser
-    from modulos.notebooklm.browser import apply_ld_library_path, launch_chromium
-
-    apply_ld_library_path()
-    with sync_playwright() as p:
-        try:
-            browser = launch_chromium(p, headless=True)
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(mensagem_erro_browser(exc)) from exc
-        page = browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(html_path.resolve().as_uri(), wait_until="networkidle")
-        page.locator("body").screenshot(path=str(png_path))
-        browser.close()
-    return png_path
-
-
-def gerar_infografico(caminhos: list[Path]) -> tuple[Path, Path]:
-    """Retorna (png_path, html_path)."""
+    Retorna (png_path, html_path_com_prompt).
+    """
     ensure_dirs()
-    dados = gerar_estrutura_infografico(caminhos)
+    dados = gerar_estrutura_infografico(caminhos, especificacoes=especificacoes)
+    prompt = montar_prompt_infografico(dados)
+    if (especificacoes or "").strip():
+        prompt = (
+            f"{prompt.rstrip()}\n\n"
+            "ESPECIFICAÇÕES ADICIONAIS DO USUÁRIO:\n"
+            f"{especificacoes.strip()}\n"
+        )
+
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     html_path = OUTPUTS_DIR / f"infografico_{stamp}.html"
     png_path = OUTPUTS_DIR / f"infografico_{stamp}.png"
-    html_path.write_text(montar_html_infografico(dados), encoding="utf-8")
-    html_para_png(html_path, png_path)
+    prompt_path = OUTPUTS_DIR / f"infografico_{stamp}_prompt.txt"
+
+    prompt_path.write_text(prompt, encoding="utf-8")
+    html_path.write_text(montar_html_preview(dados, prompt), encoding="utf-8")
+    gerar_imagem_png(prompt, destino=png_path)
     return png_path, html_path

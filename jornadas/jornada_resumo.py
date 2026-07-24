@@ -7,6 +7,7 @@ from pathlib import Path
 import streamlit as st
 
 from core.export_docx import markdown_para_docx_bytes
+from core.especificacoes_llm import campo_especificacoes_llm
 from core.openai_client import get_api_key
 from core.resumo_consolidado import (
     coletar_entradas,
@@ -20,8 +21,9 @@ from jornadas.comum import render_cabecalho
 
 def render() -> None:
     render_cabecalho(
-        "Jornada Resumo: consolida ata, personas e Especialista IA — "
-        "foco em problema e o que fazer, com fonte em cada seção."
+        "Jornada Resumo: consolida ata, personas e Especialista IA. "
+        "O documento inclui um TO-DO explícito — quem ler só este arquivo "
+        "precisa saber o que fazer."
     )
 
     entradas = coletar_entradas(st.session_state)
@@ -46,6 +48,8 @@ def render() -> None:
     if not get_api_key():
         st.warning("Configure `OPENAI_API_KEY` para gerar o resumo.")
 
+    especificacoes = campo_especificacoes_llm("jornada_resumo_especificacoes")
+
     if st.button(
         "Gerar resumo consolidado",
         type="primary",
@@ -54,7 +58,10 @@ def render() -> None:
     ):
         with st.spinner("Consolidando…"):
             try:
-                texto = gerar_resumo_consolidado(dict(st.session_state))
+                texto = gerar_resumo_consolidado(
+                    dict(st.session_state),
+                    especificacoes=especificacoes,
+                )
                 st.session_state["resumo_consolidado"] = texto
                 caminho = salvar_resumo_docx(texto)
                 st.session_state["ultimo_resumo_docx"] = str(caminho)

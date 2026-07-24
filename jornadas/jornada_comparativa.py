@@ -8,6 +8,7 @@ import streamlit as st
 
 from core.analisador import gerar_analise_comparativa, salvar_analise_comparativa
 from core.especialista_ia import nome_especialista
+from core.especificacoes_llm import campo_especificacoes_llm
 from core.lentes_continuidade import DEFAULT_LENTES, LENTES
 from core.openai_client import get_api_key
 from jornadas.comum import render_cabecalho
@@ -47,6 +48,8 @@ def render() -> None:
     with st.expander(f"Ver avaliação — {nome_especialista()}", expanded=False):
         st.markdown(avaliacao)
 
+    especificacoes = campo_especificacoes_llm("jornada_comparativa_especificacoes")
+
     c1, c2 = st.columns(2)
     with c1:
         if st.button("Gerar análise comparativa", type="primary", use_container_width=True):
@@ -62,6 +65,7 @@ def render() -> None:
                             analise_tomador=st.session_state["analise_tomador"],
                             avaliacao_especialista=avaliacao,
                             documentos=docs,
+                            especificacoes=especificacoes,
                         )
                         st.success("Comparativa gerada.")
                     except Exception as exc:  # noqa: BLE001

@@ -30,5 +30,8 @@ __all__ = [
 
 
 def upload_paths(caminhos: list[str | Path], **kwargs) -> ProdutosResultado:
-    """Compat: gera produtos NotebookLM a partir dos caminhos."""
-    return login_e_gerar_produtos([Path(c) for c in caminhos], **kwargs)
+    """Compat: gera com sessão existente; se não houver, conecta e gera."""
+    paths = [Path(c) for c in caminhos]
+    if sessao_valida():
+        return gerar_produtos(paths, **kwargs)
+    return login_e_gerar_produtos(paths, **kwargs)

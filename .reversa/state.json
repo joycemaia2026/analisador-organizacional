@@ -1,0 +1,39 @@
+{
+  "version": "1.2.43",
+  "project": "analisador-organizacional",
+  "user_name": "Joyce",
+  "chat_language": "pt-br",
+  "doc_language": "Português",
+  "answer_mode": "chat",
+  "doc_level": null,
+  "output_folder": "_reversa_sdd",
+  "forward_folder": "_reversa_forward",
+  "phase": null,
+  "completed": [],
+  "pending": [
+    "reconhecimento",
+    "escavacao",
+    "interpretacao",
+    "geracao",
+    "revisao"
+  ],
+  "checkpoints": {},
+  "engines": [
+    "cursor"
+  ],
+  "agents": [
+    "reversa",
+    "reversa-scout",
+    "reversa-archaeologist",
+    "reversa-detective",
+    "reversa-architect",
+    "reversa-writer",
+    "reversa-reviewer",
+    "reversa-visor",
+    "reversa-data-master",
+    "reversa-design-system",
+    "reversa-agents-help",
+    "reversa-reconstructor"
+  ],
+  "created_files": []
+}

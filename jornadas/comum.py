@@ -89,22 +89,22 @@ INFO_JORNADAS = {
         "titulo": "Resumo",
         "objetivo": (
             "Consolidar ata, personas e Especialista IA em um documento "
-            "enxuto — problema e o que fazer no topo, com fonte em cada seção."
+            "enxuto com TO-DO acionável — quem ler só o resumo sabe o que fazer."
         ),
         "fundamento": (
-            "Síntese executiva · rastreabilidade · continuidade organizacional."
+            "Síntese executiva · checklist de ações · rastreabilidade."
         ),
         "lentes": (
-            "Problema · ações · registro da ata · vozes das personas · stress-test IA."
+            "Problema · TO-DO · registro da ata · vozes das personas · stress-test IA."
         ),
         "passos": [
             "Confira o material das jornadas 1–2 (e 3 se houver)",
             "Gere o resumo consolidado",
-            "Revise problema e o que fazer",
+            "Revise o TO-DO (dono, prazo, prioridade)",
             "Baixe o .docx se precisar",
         ],
         "entrada": "Ata + análise do Tomador + Especialista IA",
-        "saida": "Resumo markdown/DOCX com fontes",
+        "saida": "Resumo com TO-DO + fontes (markdown/DOCX)",
     },
     "studio": {
         "titulo": "Studio / NotebookLM",

@@ -203,22 +203,22 @@ def prompt_analise(
     contexto: str = "",
     documentos: str = "",
     lentes: list[str] | None = None,
+    especificacoes: str = "",
 ) -> list[dict[str, str]]:
+    from core.especificacoes_llm import anexar_especificacoes
     from core.lentes_continuidade import montar_bloco_lentes
 
     perfil_limpo = {k: v for k, v in perfil.items() if k != "fonte"}
+    user = USER_ANALISE_TEMPLATE.format(
+        perfil_json=json.dumps(perfil_limpo, ensure_ascii=False, indent=2),
+        lentes_bloco=montar_bloco_lentes(lentes),
+        problema=problema.strip() or "(não informado — use os documentos anexos)",
+        contexto=(contexto.strip() or "(nenhum)"),
+        documentos=(documentos.strip() or "(nenhum documento anexado)"),
+    )
     return [
         {"role": "system", "content": SYSTEM_ANALISE},
-        {
-            "role": "user",
-            "content": USER_ANALISE_TEMPLATE.format(
-                perfil_json=json.dumps(perfil_limpo, ensure_ascii=False, indent=2),
-                lentes_bloco=montar_bloco_lentes(lentes),
-                problema=problema.strip() or "(não informado — use os documentos anexos)",
-                contexto=(contexto.strip() or "(nenhum)"),
-                documentos=(documentos.strip() or "(nenhum documento anexado)"),
-            ),
-        },
+        {"role": "user", "content": anexar_especificacoes(user, especificacoes)},
     ]
 
 
@@ -230,24 +230,24 @@ def prompt_avaliacao_especialista(
     especialista: dict[str, Any],
     documentos: str = "",
     lentes: list[str] | None = None,
+    especificacoes: str = "",
 ) -> list[dict[str, str]]:
+    from core.especificacoes_llm import anexar_especificacoes
     from core.lentes_continuidade import montar_bloco_lentes
 
     perfil_limpo = {k: v for k, v in perfil.items() if k != "fonte"}
+    user = USER_ESPECIALISTA_TEMPLATE.format(
+        especialista_json=json.dumps(especialista, ensure_ascii=False, indent=2),
+        perfil_json=json.dumps(perfil_limpo, ensure_ascii=False, indent=2),
+        lentes_bloco=montar_bloco_lentes(lentes),
+        problema=problema.strip() or "(não informado — use os documentos anexos)",
+        contexto=(contexto.strip() or "(nenhum)"),
+        documentos=(documentos.strip() or "(nenhum documento anexado)"),
+        analise_tomador=analise_tomador.strip(),
+    )
     return [
         {"role": "system", "content": SYSTEM_ESPECIALISTA_IA},
-        {
-            "role": "user",
-            "content": USER_ESPECIALISTA_TEMPLATE.format(
-                especialista_json=json.dumps(especialista, ensure_ascii=False, indent=2),
-                perfil_json=json.dumps(perfil_limpo, ensure_ascii=False, indent=2),
-                lentes_bloco=montar_bloco_lentes(lentes),
-                problema=problema.strip() or "(não informado — use os documentos anexos)",
-                contexto=(contexto.strip() or "(nenhum)"),
-                documentos=(documentos.strip() or "(nenhum documento anexado)"),
-                analise_tomador=analise_tomador.strip(),
-            ),
-        },
+        {"role": "user", "content": anexar_especificacoes(user, especificacoes)},
     ]
 
 
@@ -319,18 +319,19 @@ def prompt_analise_comparativa(
     analise_tomador: str,
     avaliacao_especialista: str,
     documentos: str = "",
+    especificacoes: str = "",
 ) -> list[dict[str, str]]:
+    from core.especificacoes_llm import anexar_especificacoes
+
+    user = USER_COMPARATIVA_TEMPLATE.format(
+        nome_tomador=nome_tomador or "Tomador",
+        problema=problema.strip() or "(não informado)",
+        contexto=(contexto.strip() or "(nenhum)"),
+        documentos=(documentos.strip() or "(nenhum)"),
+        analise_tomador=analise_tomador.strip(),
+        avaliacao_especialista=avaliacao_especialista.strip(),
+    )
     return [
         {"role": "system", "content": SYSTEM_COMPARATIVA},
-        {
-            "role": "user",
-            "content": USER_COMPARATIVA_TEMPLATE.format(
-                nome_tomador=nome_tomador or "Tomador",
-                problema=problema.strip() or "(não informado)",
-                contexto=(contexto.strip() or "(nenhum)"),
-                documentos=(documentos.strip() or "(nenhum)"),
-                analise_tomador=analise_tomador.strip(),
-                avaliacao_especialista=avaliacao_especialista.strip(),
-            ),
-        },
+        {"role": "user", "content": anexar_especificacoes(user, especificacoes)},
     ]

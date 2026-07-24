@@ -1,0 +1,21 @@
+installation:
+  version: 1.2.43
+  installDate: 2026-05-21T13:56:35.131Z
+  lastUpdated: 2026-05-21T13:56:35.131Z
+
+engines:
+  - cursor
+
+agents:
+  - reversa
+  - reversa-scout
+  - reversa-archaeologist
+  - reversa-detective
+  - reversa-architect
+  - reversa-writer
+  - reversa-reviewer
+  - reversa-visor
+  - reversa-data-master
+  - reversa-design-system
+  - reversa-agents-help
+  - reversa-reconstructor

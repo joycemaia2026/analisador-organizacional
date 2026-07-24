@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from core.especificacoes_llm import anexar_especificacoes
 from core.openai_client import chat_completion, get_api_key
 from modulos.ata_maker.nlp import nlp_para_markdown, run_nlp_analysis
 from modulos.ata_maker.prompts_catalog import (
@@ -60,6 +61,7 @@ def gerar_ata_prompt(
     prompt_custom: str | None = None,
     *,
     incluir_nlp: bool = False,
+    especificacoes: str = "",
 ) -> AtaGerada:
     """Modo rápido: prompt principal (+ NLP opcional ao final)."""
     if not transcricao.strip():
@@ -78,7 +80,7 @@ def gerar_ata_prompt(
             erros.append(f"NLP: {exc}")
 
     template = prompt_custom or load_default_prompt()
-    filled = fill_prompt(template, transcricao)
+    filled = anexar_especificacoes(fill_prompt(template, transcricao), especificacoes)
     partes.append(_enviar(filled))
 
     if nlp_md:
@@ -95,6 +97,7 @@ def gerar_ata_completa(
     *,
     personas: list[str] | None = None,
     incluir_nlp: bool = True,
+    especificacoes: str = "",
 ) -> AtaGerada:
     """
     Análise completa modular:
@@ -125,7 +128,7 @@ def gerar_ata_completa(
     custom = prompt_custom or load_default_prompt()
     for key in selecionadas:
         title, template = get_persona_prompt(key, custom)
-        filled = fill_prompt(template, transcricao)
+        filled = anexar_especificacoes(fill_prompt(template, transcricao), especificacoes)
         try:
             content = _enviar(filled)
             outputs[key] = content
@@ -136,7 +139,10 @@ def gerar_ata_completa(
     consolidacao = ""
     if len(outputs) >= 2:
         try:
-            cons_prompt = build_consolidation_prompt(transcricao, outputs)
+            cons_prompt = anexar_especificacoes(
+                build_consolidation_prompt(transcricao, outputs),
+                especificacoes,
+            )
             consolidacao = _enviar(cons_prompt)
             partes.insert(0, f"## Consolidação\n\n{consolidacao}")
         except Exception as exc:  # noqa: BLE001
@@ -144,11 +150,14 @@ def gerar_ata_completa(
 
     if outputs:
         try:
-            summary_prompt = build_executive_summary_prompt(
-                transcricao,
-                outputs,
-                consolidacao,
-                nlp=nlp_result,
+            summary_prompt = anexar_especificacoes(
+                build_executive_summary_prompt(
+                    transcricao,
+                    outputs,
+                    consolidacao,
+                    nlp=nlp_result,
+                ),
+                especificacoes,
             )
             executive = _enviar(summary_prompt)
             partes.insert(0, f"## Resumo executivo\n\n{executive}")
@@ -175,6 +184,7 @@ def gerar_ata(
     prompt_custom: str | None = None,
     personas: list[str] | None = None,
     incluir_nlp: bool = True,
+    especificacoes: str = "",
 ) -> AtaGerada:
     if modo == "full":
         return gerar_ata_completa(
@@ -182,9 +192,11 @@ def gerar_ata(
             prompt_custom,
             personas=personas,
             incluir_nlp=incluir_nlp,
+            especificacoes=especificacoes,
         )
     return gerar_ata_prompt(
         transcricao,
         prompt_custom,
         incluir_nlp=incluir_nlp,
+        especificacoes=especificacoes,
     )

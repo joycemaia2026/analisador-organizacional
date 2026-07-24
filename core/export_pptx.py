@@ -57,22 +57,23 @@ def _texto_fontes(caminhos: list[Path], *, max_chars: int = 60000) -> str:
     return "\n\n".join(partes)
 
 
-def gerar_outline_slides(caminhos: list[Path]) -> dict[str, Any]:
+def gerar_outline_slides(caminhos: list[Path], especificacoes: str = "") -> dict[str, Any]:
     if not get_api_key():
         raise RuntimeError("OPENAI_API_KEY não configurada.")
+    from core.especificacoes_llm import anexar_especificacoes
+
     fontes = _texto_fontes(caminhos)
     if not fontes.strip():
         raise ValueError("Fontes vazias.")
+    user = anexar_especificacoes(
+        "Com base nas fontes abaixo, gere o outline da apresentação.\n\n"
+        f"{fontes}",
+        especificacoes,
+    )
     resp = chat_completion(
         [
             {"role": "system", "content": SYSTEM_PPTX},
-            {
-                "role": "user",
-                "content": (
-                    "Com base nas fontes abaixo, gere o outline da apresentação.\n\n"
-                    f"{fontes}"
-                ),
-            },
+            {"role": "user", "content": user},
         ],
         temperature=0.3,
         response_format={"type": "json_object"},
@@ -125,9 +126,9 @@ def montar_pptx(outline: dict[str, Any], destino: Path) -> Path:
     return destino
 
 
-def gerar_apresentacao_pptx(caminhos: list[Path]) -> Path:
+def gerar_apresentacao_pptx(caminhos: list[Path], especificacoes: str = "") -> Path:
     ensure_dirs()
-    outline = gerar_outline_slides(caminhos)
+    outline = gerar_outline_slides(caminhos, especificacoes=especificacoes)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     destino = OUTPUTS_DIR / f"apresentacao_{stamp}.pptx"
     return montar_pptx(outline, destino)

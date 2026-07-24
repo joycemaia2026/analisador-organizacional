@@ -1,0 +1,46 @@
+# Reversa — Configuração do Projeto
+# Este arquivo é gerenciado pelo instalador. Para customizações, edite config.user.toml
+
+[project]
+name = "analisador-organizacional"
+version = "1.0.0"
+
+[user]
+name = "Joyce"
+chat_language = "pt-br"
+doc_language = "Português"
+
+[output]
+folder = "_reversa_sdd"
+
+[agents]
+installed = [
+  "reversa",
+  "reversa-scout",
+  "reversa-archaeologist",
+  "reversa-detective",
+  "reversa-architect",
+  "reversa-writer",
+  "reversa-reviewer",
+  "reversa-visor",
+  "reversa-data-master",
+  "reversa-design-system",
+  "reversa-agents-help",
+  "reversa-reconstructor"
+]
+
+[engines]
+installed = [
+  "cursor"
+]
+
+[analysis]
+answer_mode = "chat"
+doc_level = ""
+
+[specs]
+layout = ""
+granularity = ""
+custom_folders = []
+scout_suggestion = ""
+decided_at = ""

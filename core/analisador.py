@@ -47,6 +47,7 @@ def analisar_problema(
     contexto: str = "",
     documentos: str = "",
     lentes: list[str] | None = None,
+    especificacoes: str = "",
 ) -> str:
     """Análise sob a voz do Tomador de Decisão selecionado."""
     erro = validar_entrada(problema, documentos)
@@ -60,6 +61,7 @@ def analisar_problema(
         contexto,
         documentos=documentos,
         lentes=lentes,
+        especificacoes=especificacoes,
     )
     return chat_completion(messages, temperature=0.4)
 
@@ -71,6 +73,7 @@ def avaliar_com_especialista_ia(
     analise_tomador: str,
     documentos: str = "",
     lentes: list[str] | None = None,
+    especificacoes: str = "",
 ) -> str:
     """
     Segunda passagem: Especialista IA Sênior digere e avalia a análise do tomador.
@@ -90,6 +93,7 @@ def avaliar_com_especialista_ia(
         especialista=ESPECIALISTA_IA,
         documentos=documentos,
         lentes=lentes,
+        especificacoes=especificacoes,
     )
     return chat_completion(messages, temperature=0.35)
 
@@ -101,6 +105,7 @@ def gerar_analise_comparativa(
     analise_tomador: str,
     avaliacao_especialista: str,
     documentos: str = "",
+    especificacoes: str = "",
 ) -> str:
     """Comparação técnica entre as duas análises + conceitos envolvidos."""
     if not analise_tomador.strip() or not avaliacao_especialista.strip():
@@ -114,6 +119,7 @@ def gerar_analise_comparativa(
         analise_tomador=analise_tomador,
         avaliacao_especialista=avaliacao_especialista,
         documentos=documentos,
+        especificacoes=especificacoes,
     )
     return chat_completion(messages, temperature=0.25)
 

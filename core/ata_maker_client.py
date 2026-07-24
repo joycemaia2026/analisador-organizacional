@@ -50,6 +50,7 @@ def gerar_ata_de_transcricao(
     modo: str = "prompt",
     personas: list[str] | None = None,
     incluir_nlp: bool = True,
+    especificacoes: str = "",
 ) -> AtaGerada:
     _ = source_filename
     return gerar_ata(
@@ -57,4 +58,5 @@ def gerar_ata_de_transcricao(
         modo=modo,
         personas=personas,
         incluir_nlp=incluir_nlp,
+        especificacoes=especificacoes,
     )

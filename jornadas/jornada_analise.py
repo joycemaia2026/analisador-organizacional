@@ -7,6 +7,7 @@ from pathlib import Path
 import streamlit as st
 
 from core.analisador import analisar_problema, avaliar_com_especialista_ia, salvar_analises
+from core.especificacoes_llm import campo_especificacoes_llm
 from core.documentos import (
     TIPOS_UPLOAD,
     DocumentoEntrada,
@@ -264,10 +265,10 @@ def render() -> None:
     perfil_ids = st.multiselect(
         "Tomadores de Decisão",
         options=ids_todos,
-        default=ids_todos,
+        default=[],
         format_func=lambda pid: opcoes[pid],
-        help="Selecione uma ou várias pessoas. Por padrão, todas estão habilitadas.",
-        key="jornada_analise_tomadores",
+        help="Escolha um ou mais Tomadores. Nenhum vem pré-selecionado.",
+        key="jornada_analise_tomadores_v2",
     )
     perfis_sel = [p for p in perfis if p["id"] in perfil_ids]
 
@@ -319,6 +320,8 @@ def render() -> None:
     nomes_docs = [d.nome for d in docs_lidos]
     docs_bloco = montar_bloco_documentos(docs_lidos) if docs_lidos else ""
 
+    especificacoes = campo_especificacoes_llm("jornada_analise_especificacoes")
+
     if st.button("Analisar", type="primary"):
         if not problema.strip() and not docs_bloco.strip():
             st.error("Informe um problema ou anexe/gere pelo menos um documento.")
@@ -344,6 +347,7 @@ def render() -> None:
                     contexto,
                     documentos=docs_bloco,
                     lentes=lentes_ativas,
+                    especificacoes=especificacoes,
                 )
             except Exception as exc:  # noqa: BLE001
                 progresso.empty()
@@ -363,6 +367,7 @@ def render() -> None:
                     analise_tomador=analise_tomador,
                     documentos=docs_bloco,
                     lentes=lentes_ativas,
+                    especificacoes=especificacoes,
                 )
             except Exception as exc:  # noqa: BLE001
                 st.warning(f"Especialista indisponível para {nome}: {exc}")

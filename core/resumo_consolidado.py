@@ -14,19 +14,26 @@ from core.utils import OUTPUTS_DIR, ensure_dirs
 PROMPT_SISTEMA = """\
 Você consolida materiais de uma reunião/análise organizacional em um RESUMO EXECUTIVO.
 
+Este documento pode ser a ÚNICA leitura de quem precisa agir. Por isso o TO-DO
+deve ser autoexplicativo: quem lê só este arquivo precisa saber exatamente o que fazer.
+
 REGRAS OBRIGATÓRIAS:
 1. NÃO invente fatos, decisões, donos ou prazos que não estejam nas fontes.
-2. Priorize no topo: o PROBLEMA e O QUE FAZER (ações concretas).
-3. A seção "Resumo da ata" deve ser só registro (fatos, decisões, pendências) — SEM opinião analítica de personas ou do especialista.
-4. Em CADA seção de conteúdo, termine com uma linha: `Fonte: …` citando a origem (nome da ata, nome da persona, Especialista IA, pedido de ajuda).
-5. Se uma fonte estiver ausente, escreva honestamente "(fonte não disponível nesta sessão)".
-6. Seja conciso. Use listas. Português do Brasil.
-7. Quando Tomador e Especialista divergirem nas ações, deixe isso explícito em "O que fazer".
+2. Priorize no topo: o PROBLEMA e o TO-DO (ações concretas).
+3. A seção TO-DO é obrigatória e deve ser uma checklist acionável:
+   - cada item em uma linha começando com `- [ ]`
+   - inclua dono e prazo quando constarem nas fontes; se faltar, marque "(dono a definir)" / "(prazo a definir)"
+   - ordene por urgência (o que fazer primeiro no topo)
+   - se Tomador e Especialista divergirem, indique no item: "(Tomador)" / "(Especialista)" / "(consenso)"
+4. A seção "Resumo da ata" deve ser só registro (fatos, decisões, pendências) — SEM opinião analítica de personas ou do especialista.
+5. Em CADA seção de conteúdo (exceto Fontes), termine com uma linha: `Fonte: …`.
+6. Se uma fonte estiver ausente, escreva honestamente "(fonte não disponível nesta sessão)".
+7. Seja conciso. Use listas. Português do Brasil.
 
 ESTRUTURA EXATA (use estes títulos ##):
 
 ## 1. Problema
-## 2. O que fazer (prioritário)
+## 2. TO-DO (o que deve ser feito)
 ## 3. Resumo da ata
 ## 4. Resumo das personas consultadas
 ## 5. Resumo do Analista Sênior em IA
@@ -133,9 +140,11 @@ def _montar_contexto(entradas: dict[str, Any]) -> str:
     return "\n".join(partes)
 
 
-def gerar_resumo_consolidado(session: dict[str, Any]) -> str:
+def gerar_resumo_consolidado(session: dict[str, Any], especificacoes: str = "") -> str:
     if not get_api_key():
         raise RuntimeError("OPENAI_API_KEY não configurada.")
+
+    from core.especificacoes_llm import anexar_especificacoes
 
     entradas = coletar_entradas(session)
     if not pode_gerar(entradas):
@@ -144,10 +153,11 @@ def gerar_resumo_consolidado(session: dict[str, Any]) -> str:
         )
 
     contexto = _montar_contexto(entradas)
-    user = (
+    user = anexar_especificacoes(
         "Com base EXCLUSIVAMENTE no material abaixo, produza o resumo consolidado "
         "no formato exigido.\n\n"
-        f"{contexto}"
+        f"{contexto}",
+        especificacoes,
     )
     return chat_completion(
         [
