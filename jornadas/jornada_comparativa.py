@@ -16,16 +16,29 @@ from jornadas.comum import render_cabecalho
 
 def render() -> None:
     render_cabecalho(
-        "Jornada Comparativa: contraste técnico entre as duas análises "
-        "e lista de conceitos envolvidos."
+        "Jornada Comparativa (opcional): contraste técnico entre as duas análises "
+        "e lista de conceitos envolvidos. Pode pular sem prejuízo ao resumo final."
     )
+
+    st.markdown(
+        '<div class="jornada-card">'
+        "<b>Etapa opcional.</b> Nem sempre faz sentido (ex.: Tomador e Especialista "
+        "já alinhados em TI/IA). Se pular, o pacote do Resumo simplesmente "
+        "não inclui esta seção."
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    if st.button("Pular para o Resumo", use_container_width=True):
+        st.session_state["jornada_ativa"] = "resumo"
+        st.rerun()
 
     if not st.session_state.get("analise_tomador") or not st.session_state.get(
         "avaliacao_especialista"
     ):
         st.warning(
             "Execute antes a jornada **2 · Análise Organizacional** "
-            "(é preciso ter as duas vozes)."
+            "(é preciso ter as duas vozes) — ou pule direto ao Resumo se já tiver ata/análise."
         )
         return
 
@@ -110,3 +123,7 @@ def render() -> None:
             unsafe_allow_html=True,
         )
         st.markdown(comparativa)
+
+        if st.button("Seguir para o Resumo", type="primary", use_container_width=True):
+            st.session_state["jornada_ativa"] = "resumo"
+            st.rerun()

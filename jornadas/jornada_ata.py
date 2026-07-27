@@ -13,10 +13,12 @@ from core.documentos import TIPOS_UPLOAD, anexar_documento_sessao, extrair_texto
 from core.especificacoes_llm import campo_especificacoes_llm
 from core.export_docx import markdown_para_docx_bytes, salvar_markdown_como_docx
 from core.export_pdf import markdown_para_pdf_bytes
+from core.nlp_painel import render_painel_nlp
 from core.openai_client import get_api_key
 from core.utils import OUTPUTS_DIR, ensure_dirs
 from jornadas.comum import render_cabecalho
 from modulos.ata_maker.perguntas import SUGESTOES, responder_pergunta_transcricao
+from modulos.ata_maker.nlp import run_nlp_analysis
 
 
 def _stem_ata(nome: str) -> str:
@@ -344,6 +346,8 @@ def render() -> None:
                     especificacoes=especificacoes,
                 )
                 nome_ata = f"ata_gerada_{Path(nome_fonte).stem}.md"
+                if ata.nlp:
+                    st.session_state["ultimo_nlp"] = ata.nlp
                 if preparar_analise:
                     _preparar_para_analise(ata.texto, nome_ata)
                     st.success(
@@ -382,6 +386,26 @@ def render() -> None:
             key_prefix="dl_ata_selecionada",
         )
 
+        nlp = st.session_state.get("ultimo_nlp")
+        if nlp:
+            st.divider()
+            render_painel_nlp(nlp)
+        elif incluir_nlp:
+            if st.button("Exibir gráficos NLP da transcrição atual"):
+                try:
+                    bruto_preview, _ = _resolver_transcricao(
+                        transcricao_file, transcricao_texto
+                    )
+                    base = bruto_preview.strip()
+                    if not base:
+                        st.warning("Envie ou cole a transcrição para analisar.")
+                    else:
+                        with st.spinner("Calculando NLP…"):
+                            st.session_state["ultimo_nlp"] = run_nlp_analysis(base)
+                        st.rerun()
+                except Exception as exc:  # noqa: BLE001
+                    st.error(f"Falha no NLP: {exc}")
+
         with st.expander("Ver conteúdo da ata", expanded=True):
             st.markdown(ata_sel.get("texto", ""))
 
@@ -401,6 +425,7 @@ def render() -> None:
                     "ata_gerada_report",
                     "veio_da_ata",
                     "qa_historico",
+                    "ultimo_nlp",
                 ):
                     st.session_state.pop(k, None)
                 st.rerun()

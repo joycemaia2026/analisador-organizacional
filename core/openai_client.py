@@ -1,4 +1,4 @@
-"""Cliente OpenAI com configuração via .env."""
+"""Cliente OpenAI com configuração via .env e seletor da sessão Streamlit."""
 
 from __future__ import annotations
 
@@ -9,9 +9,12 @@ from typing import Any
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from core.modelos_llm import ids_validos
+
 load_dotenv()
 
 DEFAULT_MODEL = "gpt-4o-mini"
+SESSION_MODEL_KEY = "openai_model"
 
 
 def get_api_key() -> str | None:
@@ -21,8 +24,21 @@ def get_api_key() -> str | None:
     return key
 
 
-def get_model() -> str:
+def get_model_from_env() -> str:
     return os.getenv("OPENAI_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+
+
+def get_model() -> str:
+    """Prefere o modelo da sessão Streamlit; senão OPENAI_MODEL / default."""
+    try:
+        import streamlit as st
+
+        escolhido = (st.session_state.get(SESSION_MODEL_KEY) or "").strip()
+        if escolhido and escolhido in ids_validos():
+            return escolhido
+    except Exception:  # noqa: BLE001 — fora do Streamlit ou sessão indisponível
+        pass
+    return get_model_from_env()
 
 
 def get_image_model() -> str:
@@ -43,10 +59,11 @@ def chat_completion(
     *,
     temperature: float = 0.4,
     response_format: dict[str, Any] | None = None,
+    model: str | None = None,
 ) -> str:
     client = get_client()
     kwargs: dict[str, Any] = {
-        "model": get_model(),
+        "model": (model or get_model()).strip() or get_model(),
         "messages": messages,
         "temperature": temperature,
     }

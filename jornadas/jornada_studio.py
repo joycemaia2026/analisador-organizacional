@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
@@ -11,9 +12,13 @@ from core.export_infografico import gerar_infografico
 from core.export_pptx import gerar_apresentacao_pptx
 from core.openai_client import get_api_key
 from core.outputs_collector import listar_docx_jornadas
+from core.utils import OUTPUTS_DIR, ensure_dirs
 from jornadas.comum import render_cabecalho
 from modulos.notebooklm import gerar_produtos, login_interativo, sessao_valida
 from modulos.notebooklm.browser import chrome_instalado, chrome_real_path
+
+UPLOADS_STUDIO_DIR = OUTPUTS_DIR / "uploads_studio"
+TIPOS_UPLOAD_STUDIO = ["docx", "pdf", "txt", "md"]
 
 
 def _mime_slides(path: Path) -> str:
@@ -23,6 +28,32 @@ def _mime_slides(path: Path) -> str:
             "presentationml.presentation"
         )
     return "application/pdf"
+
+
+def _persistir_uploads(files: list) -> list[Path]:
+    """Salva uploads do computador em outputs/uploads_studio/ (uma vez por arquivo)."""
+    if not files:
+        return []
+    ensure_dirs()
+    UPLOADS_STUDIO_DIR.mkdir(parents=True, exist_ok=True)
+
+    cache: dict = st.session_state.setdefault("studio_uploads_cache", {})
+    caminhos: list[Path] = []
+    for i, f in enumerate(files):
+        nome = Path(getattr(f, "name", None) or f"upload_{i}.bin")
+        raw = f.getvalue()
+        chave = f"{nome.name}:{len(raw)}"
+        existente = cache.get(chave)
+        if existente and Path(existente).exists():
+            caminhos.append(Path(existente))
+            continue
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        stem = nome.stem[:80] or f"upload_{i}"
+        destino = UPLOADS_STUDIO_DIR / f"{stem}_{stamp}_{i}{nome.suffix.lower()}"
+        destino.write_bytes(raw)
+        cache[chave] = str(destino)
+        caminhos.append(destino)
+    return caminhos
 
 
 def _painel_downloads_notebooklm() -> None:
@@ -105,15 +136,16 @@ def _painel_downloads_locais() -> None:
 
 def render() -> None:
     render_cabecalho(
-        "Jornada Studio: autenticar no Google → selecionar artefatos → "
-        "gerar no NotebookLM → baixar nesta tela. Também há export local via OpenAI."
+        "Jornada Studio: autenticar no Google → selecionar artefatos "
+        "(sessão ou computador) → gerar no NotebookLM → baixar nesta tela."
     )
 
     st.markdown(
         '<div class="jornada-card">'
         "<b>NotebookLM:</b> "
         "1) <b>Autenticar (nova janela)</b> — login Google no Chrome. "
-        "2) <b>Selecionar</b> os documentos e o que gerar (PPTX / infográfico). "
+        "2) <b>Selecionar</b> documentos de <code>outputs/</code> e/ou "
+        "enviar arquivos do computador. "
         "3) <b>Gerar no NotebookLM</b> — o download aparece nesta aplicação."
         "</div>",
         unsafe_allow_html=True,
@@ -123,11 +155,11 @@ def render() -> None:
 
     artefatos = listar_docx_jornadas()
     if not artefatos:
-        st.warning(
-            "Nenhum `.docx` de ata/análise/comparativa em `outputs/`. "
-            "Gere e salve nas jornadas 1–3 primeiro."
+        st.info(
+            "Nenhum `.docx` das jornadas em `outputs/` ainda. "
+            "Você pode **enviar arquivos do computador** na seção 2 "
+            "ou gerar/salvar nas jornadas 1–4."
         )
-        return
 
     st.divider()
     st.subheader("1 · Autenticar")
@@ -164,16 +196,49 @@ def render() -> None:
 
     st.divider()
     st.subheader("2 · Selecionar artefatos")
-    opcoes = {str(a.caminho): a.rotulo for a in artefatos}
-    selecionados = st.multiselect(
-        "Documentos das jornadas anteriores",
-        options=list(opcoes.keys()),
-        default=[],
-        format_func=lambda p: opcoes[p],
-        key="studio_docs_sel_v2",
-        help="Escolha um ou mais .docx.",
+    caminhos: list[Path] = []
+
+    if artefatos:
+        opcoes = {str(a.caminho): a.rotulo for a in artefatos}
+        selecionados = st.multiselect(
+            "Documentos das jornadas anteriores (`outputs/`)",
+            options=list(opcoes.keys()),
+            default=[],
+            format_func=lambda p: opcoes[p],
+            key="studio_docs_sel_v2",
+            help="Escolha um ou mais .docx gerados na sessão.",
+        )
+        caminhos.extend(Path(p) for p in selecionados)
+    else:
+        st.caption("Sem artefatos em `outputs/` — use o upload abaixo.")
+
+    uploads = st.file_uploader(
+        "Ou envie arquivos do computador",
+        type=TIPOS_UPLOAD_STUDIO,
+        accept_multiple_files=True,
+        key="studio_upload_local",
+        help=(
+            "Útil se a sessão não salvou artefatos ou para usar NotebookLM "
+            "com documentos externos (.docx, .pdf, .txt, .md)."
+        ),
     )
-    caminhos = [Path(p) for p in selecionados]
+    if uploads:
+        persistidos = _persistir_uploads(list(uploads))
+        caminhos.extend(persistidos)
+        st.caption(
+            "Uploads salvos em `outputs/uploads_studio/`: "
+            + ", ".join(p.name for p in persistidos)
+        )
+
+    # Dedup por path resolvido
+    vistos: set[str] = set()
+    unicos: list[Path] = []
+    for p in caminhos:
+        chave = str(p.resolve())
+        if chave not in vistos:
+            vistos.add(chave)
+            unicos.append(p)
+    caminhos = unicos
 
     st.markdown("**O que gerar**")
     g1, g2 = st.columns(2)
@@ -198,7 +263,7 @@ def render() -> None:
         and (quer_slides or quer_info)
     )
     if not caminhos:
-        st.caption("Selecione ao menos um documento acima.")
+        st.caption("Selecione documentos de `outputs/` e/ou envie arquivos acima.")
     if not quer_slides and not quer_info:
         st.caption("Marque apresentação e/ou infográfico.")
 
@@ -211,7 +276,7 @@ def render() -> None:
         if not sessao_valida():
             st.error("Autentique primeiro (botão Autenticar — nova janela).")
         elif not caminhos:
-            st.error("Selecione ao menos um documento.")
+            st.error("Selecione ou envie ao menos um documento.")
         elif not quer_slides and not quer_info:
             st.error("Selecione apresentação e/ou infográfico.")
         else:
@@ -261,13 +326,16 @@ def render() -> None:
     st.divider()
     st.subheader("Artefatos locais (OpenAI — sem NotebookLM)")
     st.caption(
-        "Infográfico local usa o prompt corporativo 16:9 via ChatGPT Images."
+        "Infográfico local usa o prompt corporativo 16:9 via ChatGPT Images. "
+        "Prefira .docx/.txt/.md para o export local."
     )
     if not get_api_key():
         st.warning("Configure `OPENAI_API_KEY` para PPTX e infográfico locais.")
 
     if not caminhos:
-        st.caption("Selecione documentos na seção 2 para gerar artefatos locais.")
+        st.caption(
+            "Selecione ou envie documentos na seção 2 para gerar artefatos locais."
+        )
         _painel_downloads_locais()
         return
 

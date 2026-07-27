@@ -10,8 +10,6 @@ fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
-pip install -q -r requirements.txt
-
 # Browser do Playwright (idempotente)
 python -m playwright install chromium
 

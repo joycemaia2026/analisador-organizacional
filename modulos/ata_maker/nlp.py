@@ -51,6 +51,12 @@ PALAVROES = {
     "inferno", "droga", "babaca", "idiota", "imbecil", "pqp", "vsf", "foda",
 }
 
+ACAO_WORDS = {
+    "fazer", "definir", "priorizar", "entregar", "revisar", "validar", "aprovar",
+    "implementar", "corrigir", "acompanhar", "agendar", "decidir", "enviar",
+    "abrir", "fechar", "resolver", "planejar", "testar", "deploy", "migrar",
+}
+
 
 def preprocess_transcript(text: str) -> str:
     text = re.sub(r"\[\d{1,2}:\d{2}(:\d{2})?\]", " ", text)
@@ -71,6 +77,32 @@ def _normalize(word: str) -> str:
     return "".join(c for c in word if not unicodedata.combining(c))
 
 
+def _frases(text: str) -> list[str]:
+    bruto = preprocess_transcript(text)
+    partes = re.split(r"(?<=[.!?])\s+|\n+", bruto)
+    return [p.strip() for p in partes if len(p.strip().split()) >= 3]
+
+
+def _detectar_falantes(text: str) -> list[dict]:
+    """Conta falas no padrão 'Nome:' no início de linha."""
+    contagem: Counter[str] = Counter()
+    for linha in (text or "").splitlines():
+        m = re.match(r"^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s.'-]{1,40})\s*:\s+\S", linha)
+        if not m:
+            continue
+        nome = m.group(1).strip()
+        if len(nome.split()) > 5:
+            continue
+        baixo = nome.lower()
+        if baixo in {"http", "https", "www", "timestamp", "speaker"}:
+            continue
+        contagem[nome] += 1
+    return [
+        {"falante": nome, "falas": n}
+        for nome, n in contagem.most_common(12)
+    ]
+
+
 def analyze_sentiment(text: str) -> dict:
     tokens = tokenize(text)
     if not tokens:
@@ -81,6 +113,8 @@ def analyze_sentiment(text: str) -> dict:
             "compound": 0.0,
             "label": "neutro",
             "polarized_sentences": [],
+            "pos_hits": 0,
+            "neg_hits": 0,
         }
 
     pos = sum(1 for t in tokens if t in POSITIVE_WORDS)
@@ -98,11 +132,8 @@ def analyze_sentiment(text: str) -> dict:
     else:
         label = "neutro"
 
-    sentences = re.split(r"(?<=[.!?])\s+", preprocess_transcript(text))
     polarized = []
-    for sentence in sentences:
-        if len(sentence.split()) < 4:
-            continue
+    for sentence in _frases(text):
         stokens = tokenize(sentence)
         if not stokens:
             continue
@@ -126,6 +157,8 @@ def analyze_sentiment(text: str) -> dict:
         "compound": round(compound, 3),
         "label": label,
         "polarized_sentences": polarized[:8],
+        "pos_hits": pos,
+        "neg_hits": neg,
     }
 
 
@@ -141,6 +174,7 @@ def _perfil_linguistico(text: str) -> dict:
             "perfil_comunicacao": "sem dados suficientes",
             "girias": [],
             "palavroes": [],
+            "taxa_informalidade_pct": 0.0,
         }
 
     girias_norm = {_normalize(w) for w in GIRIAS}
@@ -181,21 +215,60 @@ def _perfil_linguistico(text: str) -> dict:
         "palavroes": [
             {"palavra": w, "ocorrencias": c} for w, c in palavroes_c.most_common(10)
         ],
+        "taxa_informalidade_pct": round(rate, 2),
+    }
+
+
+def _estatisticas(text: str, tokens: list[str]) -> dict:
+    chars = len(text or "")
+    palavras_brutas = re.findall(r"\b\w+\b", text or "", flags=re.UNICODE)
+    frases = _frases(text)
+    n_palavras = len(palavras_brutas)
+    n_frases = len(frases) or 1
+    unicos = len(set(tokens))
+    densidade = (100.0 * unicos / len(tokens)) if tokens else 0.0
+    media_frase = n_palavras / n_frases
+    media_tam_token = (
+        sum(len(t) for t in tokens) / len(tokens) if tokens else 0.0
+    )
+    acoes = Counter(t for t in tokens if t in ACAO_WORDS)
+    bigrams: Counter[str] = Counter()
+    for i in range(len(tokens) - 1):
+        bigrams[f"{tokens[i]} {tokens[i + 1]}"] += 1
+
+    return {
+        "caracteres": chars,
+        "palavras_brutas": n_palavras,
+        "tokens_uteis": len(tokens),
+        "vocabulario_unico": unicos,
+        "diversidade_lexical_pct": round(densidade, 1),
+        "frases": len(frases),
+        "media_palavras_por_frase": round(media_frase, 1),
+        "media_tamanho_token": round(media_tam_token, 1),
+        "verbos_acao_top": [
+            {"palavra": w, "count": c} for w, c in acoes.most_common(8)
+        ],
+        "bigramas_top": [
+            {"bigrama": b, "count": c} for b, c in bigrams.most_common(12)
+        ],
+        "falantes": _detectar_falantes(text),
     }
 
 
 def run_nlp_analysis(text: str) -> dict:
-    """Retorna sentimento, frequências e perfil linguístico."""
+    """Retorna sentimento, frequências, perfil e estatísticas."""
     tokens = tokenize(text)
     freq = Counter(tokens)
     top_words = [{"word": w, "count": c} for w, c in freq.most_common(20)]
     sentiment = analyze_sentiment(text)
     outras = _perfil_linguistico(text)
+    stats = _estatisticas(text, tokens)
     return {
         "sentiment": sentiment,
         "word_frequencies": top_words,
         "tokens_analisados": len(tokens),
         "outras": outras,
+        "estatisticas": stats,
     }
 
 
@@ -204,6 +277,7 @@ def nlp_para_markdown(nlp: dict) -> str:
     sent = nlp.get("sentiment") or {}
     palavras = nlp.get("word_frequencies") or []
     outras = nlp.get("outras") or {}
+    stats = nlp.get("estatisticas") or {}
     linhas = [
         "## Análise NLP",
         "",
@@ -212,9 +286,20 @@ def nlp_para_markdown(nlp: dict) -> str:
         f"- Compound: {sent.get('compound', '—')}",
         f"- Positivo: {sent.get('positive', '—')} · Negativo: {sent.get('negative', '—')} · "
         f"Neutro: {sent.get('neutral', '—')}",
+        f"- Hits léxico: +{sent.get('pos_hits', 0)} / −{sent.get('neg_hits', 0)}",
+        "",
+        "### Estatísticas da transcrição",
+        f"- Palavras (brutas): **{stats.get('palavras_brutas', '—')}**",
+        f"- Tokens úteis (sem stopwords): **{stats.get('tokens_uteis', '—')}**",
+        f"- Vocabulário único: **{stats.get('vocabulario_unico', '—')}** "
+        f"({stats.get('diversidade_lexical_pct', '—')}% diversidade)",
+        f"- Frases: **{stats.get('frases', '—')}** · "
+        f"média **{stats.get('media_palavras_por_frase', '—')}** palavras/frase",
+        f"- Tamanho médio do token: {stats.get('media_tamanho_token', '—')} chars",
         "",
         "### Perfil linguístico",
-        f"- Formalidade: **{outras.get('nivel_formalidade', '—')}**",
+        f"- Formalidade: **{outras.get('nivel_formalidade', '—')}** "
+        f"(taxa informalidade {outras.get('taxa_informalidade_pct', '—')}%)",
         f"- Perfil: {outras.get('perfil_comunicacao', '—')}",
         "",
         "### Palavras mais frequentes",
@@ -224,6 +309,24 @@ def nlp_para_markdown(nlp: dict) -> str:
             linhas.append(f"- {item['word']} ({item['count']})")
     else:
         linhas.append("- (sem palavras suficientes)")
+
+    bigramas = stats.get("bigramas_top") or []
+    if bigramas:
+        linhas.extend(["", "### Bigramas mais frequentes"])
+        for b in bigramas[:10]:
+            linhas.append(f"- {b['bigrama']} ({b['count']})")
+
+    acoes = stats.get("verbos_acao_top") or []
+    if acoes:
+        linhas.extend(["", "### Verbos de ação"])
+        for a in acoes:
+            linhas.append(f"- {a['palavra']} ({a['count']})")
+
+    falantes = stats.get("falantes") or []
+    if falantes:
+        linhas.extend(["", "### Falantes detectados"])
+        for f in falantes[:8]:
+            linhas.append(f"- {f['falante']}: {f['falas']} falas")
 
     polarizadas = sent.get("polarized_sentences") or []
     if polarizadas:
