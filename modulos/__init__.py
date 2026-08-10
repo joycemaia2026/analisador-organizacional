@@ -1,1 +1,1 @@
-"""Pacote de módulos do Analisador Organizacional."""
+"""Pacote de módulos do BriefBoard - Gedanken."""

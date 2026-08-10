@@ -222,7 +222,7 @@ def montar_markdown_pacote_sessao(
         etapas_ok.append("Resumo executivo")
 
     capa = [
-        "# Pacote da sessão — Analisador Organizacional",
+        "# Pacote da sessão — BriefBoard - Gedanken",
         "",
         f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
         "",
@@ -324,7 +324,7 @@ def salvar_pacote_sessao_docx(
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     caminho = OUTPUTS_DIR / f"resumo_{stamp}.docx"
     md = montar_markdown_pacote_sessao(session, resumo_llm=resumo_llm)
-    doc = criar_documento("Pacote da sessão — Analisador Organizacional")
+    doc = criar_documento("Pacote da sessão — BriefBoard - Gedanken")
     # Remove o H1 duplicado do markdown (já está no título do doc)
     linhas = md.split("\n")
     if linhas and linhas[0].startswith("# "):
@@ -345,7 +345,7 @@ def pacote_sessao_docx_bytes(
     import io
 
     md = montar_markdown_pacote_sessao(session, resumo_llm=resumo_llm)
-    doc = criar_documento("Pacote da sessão — Analisador Organizacional")
+    doc = criar_documento("Pacote da sessão — BriefBoard - Gedanken")
     linhas = md.split("\n")
     if linhas and linhas[0].startswith("# "):
         md_corpo = "\n".join(linhas[1:]).lstrip()

@@ -1,1 +1,1 @@
-"""Jornadas do Analisador Organizacional."""
+"""Jornadas do BriefBoard - Gedanken."""

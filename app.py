@@ -1,4 +1,4 @@
-"""Analisador Organizacional — acesso por jornadas."""
+"""BriefBoard — Gedanken: acesso por jornadas."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from jornadas.comum import aplicar_tema, selecionar_jornada
 
 
 st.set_page_config(
-    page_title="Analisador Organizacional",
+    page_title="BriefBoard - Gedanken",
     page_icon=str(LOGO_PATH) if LOGO_PATH.exists() else "🟩",
     layout="wide",
     initial_sidebar_state="expanded",

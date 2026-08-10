@@ -11,10 +11,10 @@ fi
 source .venv/bin/activate
 
 # Browser do Playwright (idempotente)
-python -m playwright install chromium
+python3 -m playwright install chromium
 
 # Libs do Chromium: usa extract local sem sudo se o SO não tiver libnspr4
-export LD_LIBRARY_PATH="$(python - <<'PY'
+export LD_LIBRARY_PATH="$(python3 - <<'PY'
 from modulos.notebooklm.browser import ensure_syslibs, apply_ld_library_path, prepare_browser_env
 import os
 try:

@@ -11,14 +11,14 @@ if [[ -d .venv ]]; then
   source .venv/bin/activate
 fi
 
-python -m playwright install chromium
+python3 -m playwright install chromium
 
 if [[ "${INSTALAR_SISTEMA:-0}" == "1" ]]; then
   echo "Instalando deps no sistema (sudo)…"
-  python -m playwright install-deps chromium
+  python3 -m playwright install-deps chromium
 else
   echo "Preparando libs locais em .notebooklm/syslibs (sem sudo)…"
-  python - <<'PY'
+  python3 - <<'PY'
 from modulos.notebooklm.browser import apply_ld_library_path, syslibs_ok, ensure_syslibs
 from playwright.sync_api import sync_playwright
 

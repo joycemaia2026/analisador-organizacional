@@ -214,7 +214,7 @@ def salvar_analises(
     )
     return salvar_markdown_como_docx(
         caminho,
-        "Analisador Organizacional — Relatório",
+        "BriefBoard - Gedanken — Relatório",
         conteudo,
     )
 

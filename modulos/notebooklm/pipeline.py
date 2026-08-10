@@ -193,7 +193,7 @@ async def _gerar_async(
     resultado = ProdutosResultado(ok=False)
 
     async with NotebookLMClient.from_storage(str(storage)) as client:
-        titulo = f"Analisador Organizacional {stamp}"
+        titulo = f"BriefBoard Gedanken {stamp}"
         nb = await client.notebooks.create(titulo)
         resultado.notebook_id = nb.id
         try:

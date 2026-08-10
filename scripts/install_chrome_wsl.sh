@@ -31,7 +31,7 @@ ln -sfn "$DEST/opt/google/chrome/chrome" "$BIN/chrome" 2>/dev/null || true
 if [[ -d .venv ]]; then
   # shellcheck disable=SC1091
   source .venv/bin/activate
-  python - <<'PY' || true
+  python3 - <<'PY' || true
 from modulos.notebooklm.browser import ensure_syslibs, apply_ld_library_path
 ensure_syslibs()
 apply_ld_library_path()

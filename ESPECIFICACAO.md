@@ -1,14 +1,16 @@
-# Especificação — Analisador Organizacional
+# Especificação — BriefBoard - Gedanken
 
 | Campo | Valor |
 |-------|--------|
-| Produto | Analisador Organizacional |
+| Produto | BriefBoard - Gedanken |
 | Marca | Gedanken |
+| Nome na UI | BriefBoard |
 | Slogan | Da ata à decisão — com a lente de quem lidera. |
-| Versão do documento | 1.3 |
-| Data | 2026-07-17 |
+| Versão do documento | 1.4 |
+| Data | 2026-08-10 |
 | Tipo | Especificação funcional e técnica |
 | Repositório | https://github.com/joycemaia2026/analisador-organizacional |
+| Pasta do projeto | `/home/joyce/projetos/briefboard` |
 
 ---
 
@@ -336,4 +338,4 @@ scripts/
 
 ---
 
-*Documento alinhado ao código em `/home/joyce/projetos/personas` (v1.3).*
+*Documento alinhado ao código em `/home/joyce/projetos/briefboard` (BriefBoard - Gedanken).*

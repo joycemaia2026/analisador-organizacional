@@ -1,6 +1,6 @@
-# Analisador Organizacional
+# BriefBoard - Gedanken
 
-Aplicação Streamlit (Gedanken) que transforma currículos em perfis analíticos e conduz o fluxo **ata → análise → comparativa → resumo → studio**.
+Aplicação Streamlit que transforma currículos em perfis analíticos e conduz o fluxo **ata → análise → comparativa → resumo → studio**.
 
 Documentação completa: ver [`ESPECIFICACAO.md`](ESPECIFICACAO.md).
 
@@ -9,8 +9,8 @@ Documentação completa: ver [`ESPECIFICACAO.md`](ESPECIFICACAO.md).
 1. Lê os currículos em `pessoas/*.txt` e gera perfis em `perfis/perfis.json`
 2. **Gerar Ata** — transcrição → ata (especialistas, NLP, perguntas rápidas; DOCX/PDF em `outputs/`)
 3. **Análise Organizacional** — um ou mais Tomadores + lentes + Especialista IA
-4. **Análise Comparativa** — contraste técnico entre as vozes
-5. **Resumo** — consolida ata + personas + Especialista IA (problema e o que fazer no topo)
+4. **Análise Comparativa** (opcional) — contraste técnico entre as vozes
+5. **Resumo** — pacote `resumo_*.docx` com as etapas da sessão
 6. **Studio / NotebookLM** — login Google → slide deck + infográfico; fallback PPTX/infográfico locais
 
 ## Pré-requisitos
@@ -23,7 +23,7 @@ Documentação completa: ver [`ESPECIFICACAO.md`](ESPECIFICACAO.md).
 ## Setup
 
 ```bash
-cd /home/joyce/projetos/personas
+cd /home/joyce/projetos/briefboard
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -41,7 +41,7 @@ cp .env.example .env
 # ou: source .venv/bin/activate && streamlit run app.py
 ```
 
-A interface abre em `http://localhost:8501`.
+A interface abre em `http://localhost:8501` como **BriefBoard - Gedanken**.
 
 ## Estrutura
 
@@ -58,7 +58,7 @@ outputs/               # Relatórios .docx / pptx / png
 
 1. **Gerar Ata**
 2. **Análise Organizacional**
-3. **Análise Comparativa**
+3. **Análise Comparativa** (opcional)
 4. **Resumo** — consolidação com fontes
 5. **Studio / NotebookLM** — comunicação visual
 

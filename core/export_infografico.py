@@ -102,7 +102,7 @@ def montar_html_preview(dados: dict[str, Any], prompt_usado: str) -> str:
   <h1>{titulo}</h1>
   <p>Prompt enviado ao ChatGPT Images (16:9 corporativo).</p>
   <pre>{prompt_esc}</pre>
-  <div class="brand">Gedanken · Analisador Organizacional</div>
+  <div class="brand">Gedanken · BriefBoard</div>
 </body>
 </html>
 """

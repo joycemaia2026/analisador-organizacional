@@ -1,1 +1,1 @@
-"""Núcleo do Analisador Organizacional."""
+"""Núcleo do BriefBoard - Gedanken."""

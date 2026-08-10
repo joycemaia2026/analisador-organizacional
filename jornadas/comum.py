@@ -253,7 +253,7 @@ def render_marca() -> None:
     st.markdown(
         f"""
 <div class="marca-topo">
-  <h1>Analisador Organizacional</h1>
+  <h1>BriefBoard</h1>
   <p class="marca-slogan">{SLOGAN}</p>
   <span class="gedanken-badge">Gedanken</span>
 </div>
