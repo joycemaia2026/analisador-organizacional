@@ -1,20 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
 
-if [[ ! -d .venv ]]; then
+# Sempre usar o interpretador deste projeto (não depender de activate / VIRTUAL_ENV alheio)
+if [[ ! -x .venv/bin/python ]]; then
+  echo "Criando ambiente virtual…"
   python3 -m venv .venv
 fi
+PY="$ROOT/.venv/bin/python"
 
-# shellcheck disable=SC1091
-source .venv/bin/activate
+# Garante deps mínimas no venv deste projeto
+if ! "$PY" -c "import streamlit, playwright" 2>/dev/null; then
+  echo "Instalando dependências…"
+  "$PY" -m pip install -U pip
+  "$PY" -m pip install -r requirements.txt
+fi
 
 # Browser do Playwright (idempotente)
-python3 -m playwright install chromium
+"$PY" -m playwright install chromium
 
 # Libs do Chromium: usa extract local sem sudo se o SO não tiver libnspr4
-export LD_LIBRARY_PATH="$(python3 - <<'PY'
+export LD_LIBRARY_PATH="$("$PY" - <<'PY'
 from modulos.notebooklm.browser import ensure_syslibs, apply_ld_library_path, prepare_browser_env
 import os
 try:
@@ -43,4 +51,4 @@ if [[ ! -f .env ]]; then
 fi
 
 # Tema claro + hot reload; limpa cache de dados se necessário via UI
-exec streamlit run app.py --server.runOnSave true
+exec "$PY" -m streamlit run app.py --server.runOnSave true

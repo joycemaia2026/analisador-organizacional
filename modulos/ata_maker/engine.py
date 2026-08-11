@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from core.especificacoes_llm import anexar_especificacoes
+from core.manual_voz import anexar_manual_voz_ao_sistema
 from core.openai_client import chat_completion, get_api_key
 from modulos.ata_maker.nlp import nlp_para_markdown, run_nlp_analysis
 from modulos.ata_maker.prompts_catalog import (
@@ -34,12 +35,18 @@ class AtaGerada:
     nlp: dict | None = None
 
 
-def _enviar(prompt: str, *, temperature: float = 0.3) -> str:
+def _enviar(
+    prompt: str,
+    *,
+    temperature: float = 0.3,
+    incluir_manual_voz: bool = False,
+) -> str:
     if not get_api_key():
-        raise RuntimeError("OPENAI_API_KEY não configurada no .env.")
+        raise RuntimeError("Chave de API do provedor LLM não configurada no .env.")
+    system = anexar_manual_voz_ao_sistema(SYSTEM_ATA, incluir_manual_voz)
     return chat_completion(
         [
-            {"role": "system", "content": SYSTEM_ATA},
+            {"role": "system", "content": system},
             {"role": "user", "content": prompt[:120000]},
         ],
         temperature=temperature,
@@ -62,6 +69,7 @@ def gerar_ata_prompt(
     *,
     incluir_nlp: bool = False,
     especificacoes: str = "",
+    incluir_manual_voz: bool = False,
 ) -> AtaGerada:
     """Modo rápido: prompt principal (+ NLP opcional ao final)."""
     if not transcricao.strip():
@@ -81,13 +89,13 @@ def gerar_ata_prompt(
 
     template = prompt_custom or load_default_prompt()
     filled = anexar_especificacoes(fill_prompt(template, transcricao), especificacoes)
-    partes.append(_enviar(filled))
+    partes.append(_enviar(filled, incluir_manual_voz=incluir_manual_voz))
 
     if nlp_md:
         partes.append(nlp_md)
 
     texto = "\n\n".join(partes).strip()
-    fonte = f"modulos.ata_maker:prompt(nlp={incluir_nlp})"
+    fonte = f"modulos.ata_maker:prompt(nlp={incluir_nlp};voz={incluir_manual_voz})"
     return AtaGerada(texto=texto, fonte=fonte, erros=erros, nlp=nlp_result)
 
 
@@ -98,6 +106,7 @@ def gerar_ata_completa(
     personas: list[str] | None = None,
     incluir_nlp: bool = True,
     especificacoes: str = "",
+    incluir_manual_voz: bool = False,
 ) -> AtaGerada:
     """
     Análise completa modular:
@@ -130,7 +139,7 @@ def gerar_ata_completa(
         title, template = get_persona_prompt(key, custom)
         filled = anexar_especificacoes(fill_prompt(template, transcricao), especificacoes)
         try:
-            content = _enviar(filled)
+            content = _enviar(filled, incluir_manual_voz=incluir_manual_voz)
             outputs[key] = content
             partes.append(f"## {title}\n\n{content}")
         except Exception as exc:  # noqa: BLE001
@@ -143,7 +152,7 @@ def gerar_ata_completa(
                 build_consolidation_prompt(transcricao, outputs),
                 especificacoes,
             )
-            consolidacao = _enviar(cons_prompt)
+            consolidacao = _enviar(cons_prompt, incluir_manual_voz=incluir_manual_voz)
             partes.insert(0, f"## Consolidação\n\n{consolidacao}")
         except Exception as exc:  # noqa: BLE001
             erros.append(f"Consolidador: {exc}")
@@ -159,7 +168,7 @@ def gerar_ata_completa(
                 ),
                 especificacoes,
             )
-            executive = _enviar(summary_prompt)
+            executive = _enviar(summary_prompt, incluir_manual_voz=incluir_manual_voz)
             partes.insert(0, f"## Resumo executivo\n\n{executive}")
         except Exception as exc:  # noqa: BLE001
             erros.append(f"Resumo executivo: {exc}")
@@ -173,7 +182,10 @@ def gerar_ata_completa(
         raise RuntimeError("Falha ao gerar ata: nenhuma seção produzida.")
 
     nomes = ", ".join(PERSONA_TITLES.get(k, k) for k in selecionadas) or "nenhum"
-    fonte = f"modulos.ata_maker:full(nlp={incluir_nlp}; especialistas={nomes})"
+    fonte = (
+        f"modulos.ata_maker:full(nlp={incluir_nlp};voz={incluir_manual_voz};"
+        f"especialistas={nomes})"
+    )
     return AtaGerada(texto=texto, fonte=fonte, erros=erros, nlp=nlp_result)
 
 
@@ -185,6 +197,7 @@ def gerar_ata(
     personas: list[str] | None = None,
     incluir_nlp: bool = True,
     especificacoes: str = "",
+    incluir_manual_voz: bool = False,
 ) -> AtaGerada:
     if modo == "full":
         return gerar_ata_completa(
@@ -193,10 +206,12 @@ def gerar_ata(
             personas=personas,
             incluir_nlp=incluir_nlp,
             especificacoes=especificacoes,
+            incluir_manual_voz=incluir_manual_voz,
         )
     return gerar_ata_prompt(
         transcricao,
         prompt_custom,
         incluir_nlp=incluir_nlp,
         especificacoes=especificacoes,
+        incluir_manual_voz=incluir_manual_voz,
     )

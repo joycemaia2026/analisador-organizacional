@@ -1,4 +1,4 @@
-"""Catálogo de modelos OpenAI disponíveis na UI, com custo estimado em R$."""
+"""Catálogo de modelos OpenAI/Gemini disponíveis na UI, com custo estimado em R$."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from dataclasses import dataclass
 TOKENS_ENTRADA_TIPICOS = 8_000
 TOKENS_SAIDA_TIPICOS = 2_000
 
-# Análise organizacional típica = Tomador + Especialista IA (2 chamadas).
+# Análise institucional típica = Tomador + Especialista IA (2 chamadas).
 CHAMADAS_POR_ANALISE = 2
 
 # Cotação de referência USD→BRL (override via .env USD_BRL).
@@ -35,15 +35,17 @@ class ModeloLLM:
     descricao: str
     input_por_1m: float  # USD por 1M tokens de entrada
     output_por_1m: float  # USD por 1M tokens de saída
+    provider: str = "openai"  # openai | gemini
 
 
-MODELOS: tuple[ModeloLLM, ...] = (
+MODELOS_OPENAI: tuple[ModeloLLM, ...] = (
     ModeloLLM(
         id="gpt-4o-mini",
         nome="GPT-4o mini",
         descricao="Padrão: rápido e econômico para atas e análises do dia a dia.",
         input_por_1m=0.15,
         output_por_1m=0.60,
+        provider="openai",
     ),
     ModeloLLM(
         id="gpt-4.1-mini",
@@ -51,6 +53,7 @@ MODELOS: tuple[ModeloLLM, ...] = (
         descricao="Melhor custo/qualidade — diagnósticos e planos um pouco mais densos.",
         input_por_1m=0.40,
         output_por_1m=1.60,
+        provider="openai",
     ),
     ModeloLLM(
         id="gpt-4o",
@@ -58,6 +61,7 @@ MODELOS: tuple[ModeloLLM, ...] = (
         descricao="Qualidade geral alta. Use quando a nuance da análise justificar o custo.",
         input_por_1m=2.50,
         output_por_1m=10.00,
+        provider="openai",
     ),
     ModeloLLM(
         id="gpt-4.1",
@@ -65,22 +69,64 @@ MODELOS: tuple[ModeloLLM, ...] = (
         descricao="Contexto longo e produção — análises comparativas e documentos densos.",
         input_por_1m=2.00,
         output_por_1m=8.00,
+        provider="openai",
     ),
 )
+
+# Preços de referência Gemini (USD / 1M tokens) — aproximados para estimativa na UI.
+MODELOS_GEMINI: tuple[ModeloLLM, ...] = (
+    ModeloLLM(
+        id="gemini-2.0-flash",
+        nome="Gemini 2.0 Flash",
+        descricao="Padrão Gemini: rápido e econômico para atas e análises.",
+        input_por_1m=0.10,
+        output_por_1m=0.40,
+        provider="gemini",
+    ),
+    ModeloLLM(
+        id="gemini-2.5-flash",
+        nome="Gemini 2.5 Flash",
+        descricao="Bom equilíbrio custo/qualidade no ecossistema Google.",
+        input_por_1m=0.15,
+        output_por_1m=0.60,
+        provider="gemini",
+    ),
+    ModeloLLM(
+        id="gemini-2.5-pro",
+        nome="Gemini 2.5 Pro",
+        descricao="Maior qualidade Gemini — análises densas e contexto longo.",
+        input_por_1m=1.25,
+        output_por_1m=10.00,
+        provider="gemini",
+    ),
+)
+
+MODELOS: tuple[ModeloLLM, ...] = MODELOS_OPENAI + MODELOS_GEMINI
 
 _POR_ID: dict[str, ModeloLLM] = {m.id: m for m in MODELOS}
 
 
-def ids_validos() -> frozenset[str]:
-    return frozenset(_POR_ID)
+def ids_validos(provider: str | None = None) -> frozenset[str]:
+    if provider is None:
+        return frozenset(_POR_ID)
+    prov = provider.strip().lower()
+    return frozenset(m.id for m in MODELOS if m.provider == prov)
 
 
 def obter_modelo(modelo_id: str) -> ModeloLLM | None:
     return _POR_ID.get((modelo_id or "").strip())
 
 
-def lista_ids_ordenados() -> list[str]:
-    return [m.id for m in MODELOS]
+def lista_ids_ordenados(provider: str | None = "openai") -> list[str]:
+    if provider is None:
+        return [m.id for m in MODELOS]
+    prov = provider.strip().lower()
+    return [m.id for m in MODELOS if m.provider == prov]
+
+
+def default_modelo_id(provider: str) -> str:
+    ids = lista_ids_ordenados(provider)
+    return ids[0] if ids else "gpt-4o-mini"
 
 
 def custo_geracao_usd(modelo: ModeloLLM) -> float:

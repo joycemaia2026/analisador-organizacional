@@ -222,7 +222,7 @@ def render() -> None:
     else:
         st.warning(health.message)
         if not get_api_key():
-            st.info("Configure `OPENAI_API_KEY` no `.env` e recarregue.")
+            st.info("Configure a chave do provedor LLM no `.env` e recarregue.")
 
     st.markdown(
         '<div class="jornada-card">'
@@ -261,20 +261,33 @@ def render() -> None:
     st.divider()
     st.subheader("Gerar ata")
 
-    modo_ata = st.radio(
-        "Modo de geração",
-        options=["prompt", "full"],
-        format_func=lambda m: (
-            "Prompt principal (mais rápido)"
-            if m == "prompt"
-            else "Análise completa (especialistas)"
-        ),
-        horizontal=True,
-        key="jornada_ata_modo",
+    st.markdown("#### Etapas da geração")
+    opt_gerar = st.checkbox(
+        "1. Gerar Ata",
+        value=True,
+        key="jornada_ata_opt_gerar",
+    )
+    st.checkbox(
+        "2. Aplicar Skills",
+        value=False,
+        key="jornada_ata_opt_skills",
+        disabled=True,
+        help="Em breve: apontar pasta de skills.",
+    )
+    opt_especialistas = st.checkbox(
+        "3. Visão de Especialistas",
+        value=False,
+        key="jornada_ata_opt_especialistas",
+    )
+    incluir_nlp = st.checkbox(
+        "4. Análise de Sentimento com NLP",
+        value=True,
+        key="jornada_ata_opt_nlp",
+        help="Sentimento, palavras frequentes e perfil linguístico.",
     )
 
     especialistas_sel: list[str] = []
-    if modo_ata == "full":
+    if opt_especialistas:
         st.markdown("#### Tipos de especialistas")
         opcoes_esp = listar_especialistas()
         ids_esp = [k for k, _ in opcoes_esp]
@@ -299,25 +312,32 @@ def render() -> None:
             help="Use Selecionar todos ou escolha individualmente.",
         )
         if not especialistas_sel:
-            st.warning("Selecione ao menos um especialista para a análise completa.")
+            st.warning("Selecione ao menos um especialista para a visão de especialistas.")
 
-    st.markdown("#### Análise de NLP")
-    incluir_nlp = st.checkbox(
-        "Incluir análise NLP (sentimento, palavras frequentes, perfil linguístico)",
-        value=True,
-        key="jornada_ata_nlp",
-        help="Disponível no prompt principal e na análise completa.",
-    )
+        incluir_manual_voz = st.checkbox(
+            "Incluir Manual de Voz Gedanken",
+            value=True,
+            key="jornada_ata_opt_manual_voz",
+            help="Injeta docs/voz-gedanken.md no system prompt junto com as personas.",
+        )
+    else:
+        incluir_manual_voz = False
+
+    modo_ata = "full" if opt_especialistas else "prompt"
 
     preparar_analise = st.checkbox(
-        "Após gerar, preparar Análise Organizacional (anexar ata e preencher pedido — sem mudar de jornada)",
+        "Após gerar, preparar Análise Institucional (anexar ata e preencher pedido — sem mudar de jornada)",
         value=False,
         key="ata_preparar_analise",
     )
 
     especificacoes = campo_especificacoes_llm("jornada_ata_especificacoes")
 
-    gerar_ok = health.online and (modo_ata != "full" or bool(especialistas_sel))
+    gerar_ok = (
+        health.online
+        and opt_gerar
+        and (not opt_especialistas or bool(especialistas_sel))
+    )
     if st.button(
         "Gerar ata",
         type="primary",
@@ -341,9 +361,10 @@ def render() -> None:
                     bruto,
                     source_filename=nome_fonte,
                     modo=modo_ata,
-                    personas=especialistas_sel if modo_ata == "full" else None,
+                    personas=especialistas_sel if opt_especialistas else None,
                     incluir_nlp=incluir_nlp,
                     especificacoes=especificacoes,
+                    incluir_manual_voz=incluir_manual_voz,
                 )
                 nome_ata = f"ata_gerada_{Path(nome_fonte).stem}.md"
                 if ata.nlp:
@@ -352,13 +373,13 @@ def render() -> None:
                     _preparar_para_analise(ata.texto, nome_ata)
                     st.success(
                         "Ata gerada e preparada para a Análise "
-                        "(permanece nesta jornada). Use **2 · Análise Organizacional** quando quiser."
+                        "(permanece nesta jornada). Use **2 · Análise Institucional** quando quiser."
                     )
                 else:
                     _registrar_ata(nome_ata, ata.texto)
                     st.success(
                         "Ata gerada, anexada e salva em `outputs/`. "
-                        "Use o botão abaixo ou a jornada **2 · Análise Organizacional**."
+                        "Use o botão abaixo ou a jornada **2 · Análise Institucional**."
                     )
                 if ata.erros:
                     st.warning("Avisos: " + "; ".join(ata.erros))

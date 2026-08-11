@@ -16,7 +16,7 @@ from core.openai_client import chat_completion, get_api_key
 from core.utils import OUTPUTS_DIR, ensure_dirs
 
 PROMPT_SISTEMA = """\
-Você consolida materiais de uma reunião/análise organizacional em um RESUMO EXECUTIVO.
+Você consolida materiais de uma reunião/análise institucional em um RESUMO EXECUTIVO.
 
 Este documento pode ser a ÚNICA leitura de quem precisa agir. Por isso o TO-DO
 deve ser autoexplicativo: quem lê só este arquivo precisa saber exatamente o que fazer.
@@ -169,14 +169,14 @@ def _montar_contexto(entradas: dict[str, Any]) -> str:
 
 def gerar_resumo_consolidado(session: dict[str, Any], especificacoes: str = "") -> str:
     if not get_api_key():
-        raise RuntimeError("OPENAI_API_KEY não configurada.")
+        raise RuntimeError("Chave de API do provedor LLM não configurada.")
 
     from core.especificacoes_llm import anexar_especificacoes
 
     entradas = coletar_entradas(session)
     if not pode_gerar(entradas):
         raise RuntimeError(
-            "Não há material para resumir. Gere ata e/ou análise organizacional antes."
+            "Não há material para resumir. Gere ata e/ou análise institucional antes."
         )
 
     contexto = _montar_contexto(entradas)
@@ -215,7 +215,7 @@ def montar_markdown_pacote_sessao(
     if entradas["tem_ata"]:
         etapas_ok.append("Ata")
     if entradas["tem_personas"] or entradas["tem_especialista"]:
-        etapas_ok.append("Análise organizacional")
+        etapas_ok.append("Análise institucional")
     if entradas["tem_comparativa"]:
         etapas_ok.append("Comparativa")
     if resumo.strip():
@@ -293,7 +293,7 @@ def montar_markdown_pacote_sessao(
             f"{entradas['avaliacao_especialista']}"
         )
     blocos.append(
-        _secao("3 · Análise organizacional", "\n\n".join(partes_an) if partes_an else "")
+        _secao("3 · Análise institucional", "\n\n".join(partes_an) if partes_an else "")
     )
 
     # Comparativa — só inclui se a etapa foi executada

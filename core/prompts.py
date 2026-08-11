@@ -1,4 +1,4 @@
-"""Prompts de conversão de currículo e de análise organizacional."""
+"""Prompts de conversão de currículo e de análise institucional."""
 
 from __future__ import annotations
 
@@ -204,9 +204,11 @@ def prompt_analise(
     documentos: str = "",
     lentes: list[str] | None = None,
     especificacoes: str = "",
+    incluir_manual_voz: bool = False,
 ) -> list[dict[str, str]]:
     from core.especificacoes_llm import anexar_especificacoes
     from core.lentes_continuidade import montar_bloco_lentes
+    from core.manual_voz import anexar_manual_voz_ao_sistema
 
     perfil_limpo = {k: v for k, v in perfil.items() if k != "fonte"}
     user = USER_ANALISE_TEMPLATE.format(
@@ -217,7 +219,10 @@ def prompt_analise(
         documentos=(documentos.strip() or "(nenhum documento anexado)"),
     )
     return [
-        {"role": "system", "content": SYSTEM_ANALISE},
+        {
+            "role": "system",
+            "content": anexar_manual_voz_ao_sistema(SYSTEM_ANALISE, incluir_manual_voz),
+        },
         {"role": "user", "content": anexar_especificacoes(user, especificacoes)},
     ]
 
@@ -231,9 +236,11 @@ def prompt_avaliacao_especialista(
     documentos: str = "",
     lentes: list[str] | None = None,
     especificacoes: str = "",
+    incluir_manual_voz: bool = False,
 ) -> list[dict[str, str]]:
     from core.especificacoes_llm import anexar_especificacoes
     from core.lentes_continuidade import montar_bloco_lentes
+    from core.manual_voz import anexar_manual_voz_ao_sistema
 
     perfil_limpo = {k: v for k, v in perfil.items() if k != "fonte"}
     user = USER_ESPECIALISTA_TEMPLATE.format(
@@ -246,7 +253,12 @@ def prompt_avaliacao_especialista(
         analise_tomador=analise_tomador.strip(),
     )
     return [
-        {"role": "system", "content": SYSTEM_ESPECIALISTA_IA},
+        {
+            "role": "system",
+            "content": anexar_manual_voz_ao_sistema(
+                SYSTEM_ESPECIALISTA_IA, incluir_manual_voz
+            ),
+        },
         {"role": "user", "content": anexar_especificacoes(user, especificacoes)},
     ]
 

@@ -1,4 +1,4 @@
-"""Motor de análise organizacional (Tomador + Especialista IA)."""
+"""Motor de análise institucional (Tomador + Especialista IA)."""
 
 from __future__ import annotations
 
@@ -25,7 +25,8 @@ def validar_entrada(problema: str, documentos: str = "") -> str | None:
 def _garantir_api() -> None:
     if not get_api_key():
         raise RuntimeError(
-            "OPENAI_API_KEY não configurada. Copie .env.example para .env e preencha a chave."
+            "Chave de API do provedor LLM não configurada. "
+            "Preencha OPENAI_API_KEY e/ou GEMINI_API_KEY no .env."
         )
 
 
@@ -48,6 +49,7 @@ def analisar_problema(
     documentos: str = "",
     lentes: list[str] | None = None,
     especificacoes: str = "",
+    incluir_manual_voz: bool = False,
 ) -> str:
     """Análise sob a voz do Tomador de Decisão selecionado."""
     erro = validar_entrada(problema, documentos)
@@ -62,6 +64,7 @@ def analisar_problema(
         documentos=documentos,
         lentes=lentes,
         especificacoes=especificacoes,
+        incluir_manual_voz=incluir_manual_voz,
     )
     return chat_completion(messages, temperature=0.4)
 
@@ -74,6 +77,7 @@ def avaliar_com_especialista_ia(
     documentos: str = "",
     lentes: list[str] | None = None,
     especificacoes: str = "",
+    incluir_manual_voz: bool = False,
 ) -> str:
     """
     Segunda passagem: Especialista IA Sênior digere e avalia a análise do tomador.
@@ -94,6 +98,7 @@ def avaliar_com_especialista_ia(
         documentos=documentos,
         lentes=lentes,
         especificacoes=especificacoes,
+        incluir_manual_voz=incluir_manual_voz,
     )
     return chat_completion(messages, temperature=0.35)
 

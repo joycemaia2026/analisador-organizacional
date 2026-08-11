@@ -6,7 +6,7 @@
 | Marca | Gedanken |
 | Nome na UI | BriefBoard |
 | Slogan | Da ata à decisão — com a lente de quem lidera. |
-| Versão do documento | 1.4 |
+| Versão do documento | 5 |
 | Data | 2026-08-10 |
 | Tipo | Especificação funcional e técnica |
 | Repositório | https://github.com/joycemaia2026/analisador-organizacional |
@@ -52,7 +52,7 @@ Reuniões geram informação dispersa; decisões e pendências se perdem; perfis
 
 - Geração de ata (modo prompt ou completo; especialistas; NLP opcional; Q&A)  
 - Gestão de personas via pasta `pessoas/` (adicionar / atualizar)  
-- Análise organizacional com **um ou mais Tomadores** + Especialista IA + lentes  
+- Análise institucional com **um ou mais Tomadores** + Especialista IA + lentes  
 - Análise comparativa entre as vozes  
 - Resumo consolidado (problema e o que fazer no topo; `Fonte:` por seção)  
 - Studio / NotebookLM (opcional) + PPTX/infográfico locais  
@@ -129,7 +129,7 @@ Interface: `http://localhost:8501`.
 - Perguntas rápidas sobre a transcrição  
 - Encaminhamento automático opcional para Análise (anexa ata + preenche pedido)  
 
-### 4.2 Jornada 2 — Análise Organizacional
+### 4.2 Jornada 2 — Análise Institucional
 
 **Objetivo:** Tomador(es) interpretam problema/atas; Especialista IA faz stress-test.
 

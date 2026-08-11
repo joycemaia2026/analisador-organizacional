@@ -33,7 +33,7 @@ def render() -> None:
 
     if not pode_gerar(entradas):
         st.warning(
-            "Gere pelo menos uma **ata** (jornada 1) ou a **análise organizacional** "
+            "Gere pelo menos uma **ata** (jornada 1) ou a **análise institucional** "
             "(jornada 2) antes de consolidar."
         )
         return
@@ -53,7 +53,7 @@ def render() -> None:
         )
 
     if not get_api_key():
-        st.warning("Configure `OPENAI_API_KEY` para gerar o resumo executivo.")
+        st.warning("Configure a chave do provedor LLM para gerar o resumo executivo.")
 
     especificacoes = campo_especificacoes_llm("jornada_resumo_especificacoes")
 

@@ -37,7 +37,7 @@ def render() -> None:
         "avaliacao_especialista"
     ):
         st.warning(
-            "Execute antes a jornada **2 · Análise Organizacional** "
+            "Execute antes a jornada **2 · Análise Institucional** "
             "(é preciso ter as duas vozes) — ou pule direto ao Resumo se já tiver ata/análise."
         )
         return
@@ -67,7 +67,7 @@ def render() -> None:
     with c1:
         if st.button("Gerar análise comparativa", type="primary", use_container_width=True):
             if not get_api_key():
-                st.error("OPENAI_API_KEY não configurada.")
+                st.error("Chave de API do provedor LLM não configurada.")
             else:
                 with st.spinner("Gerando comparação técnica…"):
                     try:

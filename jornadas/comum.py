@@ -8,19 +8,29 @@ import streamlit as st
 
 from core.modelos_llm import (
     custo_analise_brl,
+    default_modelo_id,
     formatar_reais,
     lista_ids_ordenados,
     obter_modelo,
     rotulo_selectbox,
     texto_custo,
 )
-from core.openai_client import SESSION_MODEL_KEY, get_model_from_env
+from core.openai_client import (
+    SESSION_MODEL_KEY,
+    SESSION_PROVIDER_KEY,
+    get_api_key,
+    get_gemini_api_key,
+    get_model_from_env,
+    get_openai_api_key,
+    get_provider,
+    provider_label,
+)
 from core.outputs_collector import contar_docx_jornadas
 from core.utils import LOGO_PATH, ensure_dirs
 
 JORNADAS = {
     "ata": "1 · Gerar Ata",
-    "analise": "2 · Análise Organizacional",
+    "analise": "2 · Análise Institucional",
     "comparativa": "3 · Análise Comparativa",
     "resumo": "4 · Resumo",
     "studio": "5 · Studio / NotebookLM",
@@ -43,14 +53,14 @@ INFO_JORNADAS = {
         "passos": [
             "Envie ou cole a transcrição",
             "Faça perguntas rápidas (opcional)",
-            "Escolha especialistas e/ou NLP e gere a ata",
+            "Marque Gerar Ata, Especialistas e/ou NLP (Skills em breve)",
             "Leve o registro à jornada 2",
         ],
         "entrada": "Transcrição informal",
         "saida": "Respostas rápidas + ata acionável",
     },
     "analise": {
-        "titulo": "Análise Organizacional",
+        "titulo": "Análise Institucional",
         "objetivo": (
             "Decidir e priorizar sob o olhar do Tomador; o Especialista IA "
             "faz o stress-test da solução."
@@ -309,7 +319,7 @@ def _barra_jornadas_topo() -> str:
         """
 **Como usar os módulos**
 1. **Gerar Ata** — transforma a transcrição em ata estruturada; permite perguntas rápidas, escolha de especialistas e análise NLP.
-2. **Análise Organizacional** — o Tomador de Decisão interpreta o problema e as atas; o Especialista IA faz o stress-test da visão.
+2. **Análise Institucional** — o Tomador de Decisão interpreta o problema e as atas; o Especialista IA faz o stress-test da visão.
 3. **Análise Comparativa (opcional)** — confronta as duas vozes quando o contraste agregar; pode pular sem prejuízo ao pacote final.
 4. **Resumo** — consolida as etapas da sessão em `outputs/resumo_*.docx` com TO-DO acionável.
 5. **Studio / NotebookLM** — envia artefatos de `outputs/` ou arquivos do computador ao NotebookLM e gera PPTX + infográfico.
@@ -367,41 +377,92 @@ def selecionar_jornada() -> str:
         if meta:
             st.divider()
             st.caption(
-                f"Modelo ativo: **{meta.nome}** · "
+                f"Provedor: **{provider_label()}** · "
+                f"Modelo: **{meta.nome}** · "
                 f"≈ {formatar_reais(custo_analise_brl(meta))} / análise"
             )
+        else:
+            st.divider()
+            st.caption(f"Provedor ativo: **{provider_label()}**")
 
     return jornada
 
 
+def _garantir_provedor_sessao() -> str:
+    if SESSION_PROVIDER_KEY not in st.session_state:
+        st.session_state[SESSION_PROVIDER_KEY] = get_provider()
+    prov = (st.session_state.get(SESSION_PROVIDER_KEY) or "openai").strip().lower()
+    if prov not in {"openai", "gemini"}:
+        prov = "openai"
+        st.session_state[SESSION_PROVIDER_KEY] = prov
+    return prov
+
+
 def _garantir_modelo_sessao() -> list[str]:
-    ids = lista_ids_ordenados()
+    prov = _garantir_provedor_sessao()
+    ids = lista_ids_ordenados(prov)
+    padrao = default_modelo_id(prov)
     if SESSION_MODEL_KEY not in st.session_state:
-        env_model = get_model_from_env()
+        env_model = get_model_from_env(prov)
         st.session_state[SESSION_MODEL_KEY] = (
-            env_model if env_model in ids else "gpt-4o-mini"
+            env_model if env_model in ids else padrao
         )
     elif st.session_state[SESSION_MODEL_KEY] not in ids:
-        st.session_state[SESSION_MODEL_KEY] = "gpt-4o-mini"
+        st.session_state[SESSION_MODEL_KEY] = padrao
     return ids
 
 
+def _on_provider_change() -> None:
+    """Ao trocar provedor, força um modelo válido daquele catálogo."""
+    prov = (st.session_state.get(SESSION_PROVIDER_KEY) or "openai").strip().lower()
+    ids = lista_ids_ordenados(prov)
+    atual = (st.session_state.get(SESSION_MODEL_KEY) or "").strip()
+    if atual not in ids:
+        st.session_state[SESSION_MODEL_KEY] = default_modelo_id(prov)
+
+
 def _render_painel_modelos() -> None:
-    """Seletor compacto de modelo GPT (vale para todas as jornadas LLM)."""
+    """Seletor de provedor + modelo (vale para todas as jornadas LLM)."""
+    _garantir_provedor_sessao()
     ids = _garantir_modelo_sessao()
 
-    c1, c2 = st.columns([2, 3])
+    openai_ok = bool(get_openai_api_key())
+    gemini_ok = bool(get_gemini_api_key())
+
+    c0, c1, c2 = st.columns([1.4, 2, 2.6])
+    with c0:
+        st.radio(
+            "Provedor LLM",
+            options=["openai", "gemini"],
+            format_func=lambda p: (
+                f"OpenAI{' ✓' if openai_ok else ''}"
+                if p == "openai"
+                else f"Gemini{' ✓' if gemini_ok else ''}"
+            ),
+            horizontal=True,
+            key=SESSION_PROVIDER_KEY,
+            on_change=_on_provider_change,
+            help="Escolha qual API usar. Configure OPENAI_API_KEY e/ou GEMINI_API_KEY no .env.",
+        )
     with c1:
+        # Revalida ids após possível troca de provedor no mesmo rerun.
+        ids = _garantir_modelo_sessao()
+        label = "Modelo Gemini" if get_provider() == "gemini" else "Modelo GPT"
         st.selectbox(
-            "Modelo GPT",
+            label,
             options=ids,
             format_func=rotulo_selectbox,
             key=SESSION_MODEL_KEY,
             help="Usado em ata, análise, comparativa, resumo e Studio local.",
         )
     with c2:
-        escolhido = st.session_state.get(SESSION_MODEL_KEY) or "gpt-4o-mini"
+        escolhido = st.session_state.get(SESSION_MODEL_KEY) or ids[0]
         st.caption(texto_custo(escolhido))
+        if not get_api_key():
+            env_name = (
+                "GEMINI_API_KEY" if get_provider() == "gemini" else "OPENAI_API_KEY"
+            )
+            st.caption(f"⚠️ Configure `{env_name}` no `.env`.")
 
 
 def _render_seletor_modelo() -> None:

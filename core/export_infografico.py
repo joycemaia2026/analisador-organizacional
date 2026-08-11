@@ -59,7 +59,7 @@ def gerar_estrutura_infografico(
         raise ValueError("Fontes vazias.")
     user = anexar_especificacoes(
         "Com base nas fontes abaixo, preencha o JSON do infográfico "
-        "(arquitetura de produto / análise organizacional).\n\n"
+        "(arquitetura de produto / análise institucional).\n\n"
         f"{fontes}",
         especificacoes,
     )

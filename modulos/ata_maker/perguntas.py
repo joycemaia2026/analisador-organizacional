@@ -35,7 +35,7 @@ def responder_pergunta_transcricao(
     `historico` opcional: [{"pergunta": "...", "resposta": "..."}, ...]
     """
     if not get_api_key():
-        raise RuntimeError("OPENAI_API_KEY não configurada no .env.")
+        raise RuntimeError("Chave de API do provedor LLM não configurada no .env.")
     if not (transcricao or "").strip():
         raise ValueError("Transcrição vazia.")
     if not (pergunta or "").strip():

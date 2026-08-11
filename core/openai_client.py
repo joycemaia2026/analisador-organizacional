@@ -1,4 +1,8 @@
-"""Cliente OpenAI com configuração via .env e seletor da sessão Streamlit."""
+"""Cliente LLM (OpenAI ou Gemini) via .env e seletor da sessão Streamlit.
+
+Gemini usa a API compatível com OpenAI:
+https://generativelanguage.googleapis.com/v1beta/openai/
+"""
 
 from __future__ import annotations
 
@@ -9,32 +13,78 @@ from typing import Any
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from core.modelos_llm import ids_validos
+from core.modelos_llm import ids_validos, lista_ids_ordenados
 
 load_dotenv()
 
-DEFAULT_MODEL = "gpt-4o-mini"
-SESSION_MODEL_KEY = "openai_model"
+DEFAULT_PROVIDER = "openai"
+DEFAULT_MODEL_OPENAI = "gpt-4o-mini"
+DEFAULT_MODEL_GEMINI = "gemini-2.0-flash"
+SESSION_PROVIDER_KEY = "llm_provider"
+SESSION_MODEL_KEY = "openai_model"  # mantido por compatibilidade da sessão
+
+GEMINI_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 
-def get_api_key() -> str | None:
+def get_provider() -> str:
+    """Prefere o provedor da sessão Streamlit; senão LLM_PROVIDER / openai."""
+    try:
+        import streamlit as st
+
+        escolhido = (st.session_state.get(SESSION_PROVIDER_KEY) or "").strip().lower()
+        if escolhido in {"openai", "gemini"}:
+            return escolhido
+    except Exception:  # noqa: BLE001
+        pass
+    env = (os.getenv("LLM_PROVIDER") or DEFAULT_PROVIDER).strip().lower()
+    return env if env in {"openai", "gemini"} else DEFAULT_PROVIDER
+
+
+def get_openai_api_key() -> str | None:
     key = os.getenv("OPENAI_API_KEY", "").strip()
     if not key or key == "coloque_sua_chave_aqui":
         return None
     return key
 
 
-def get_model_from_env() -> str:
-    return os.getenv("OPENAI_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+def get_gemini_api_key() -> str | None:
+    key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not key or key == "coloque_sua_chave_aqui":
+        return None
+    return key
+
+
+def get_api_key(provider: str | None = None) -> str | None:
+    """Chave do provedor ativo (ou do informado)."""
+    prov = (provider or get_provider()).strip().lower()
+    if prov == "gemini":
+        return get_gemini_api_key()
+    return get_openai_api_key()
+
+
+def provider_label(provider: str | None = None) -> str:
+    return "Gemini" if (provider or get_provider()) == "gemini" else "OpenAI"
+
+
+def get_model_from_env(provider: str | None = None) -> str:
+    prov = (provider or get_provider()).strip().lower()
+    if prov == "gemini":
+        return (
+            os.getenv("GEMINI_MODEL", DEFAULT_MODEL_GEMINI).strip()
+            or DEFAULT_MODEL_GEMINI
+        )
+    return (
+        os.getenv("OPENAI_MODEL", DEFAULT_MODEL_OPENAI).strip() or DEFAULT_MODEL_OPENAI
+    )
 
 
 def get_model() -> str:
-    """Prefere o modelo da sessão Streamlit; senão OPENAI_MODEL / default."""
+    """Prefere o modelo da sessão Streamlit; senão env / default do provedor."""
     try:
         import streamlit as st
 
         escolhido = (st.session_state.get(SESSION_MODEL_KEY) or "").strip()
-        if escolhido and escolhido in ids_validos():
+        if escolhido and escolhido in ids_validos(get_provider()):
             return escolhido
     except Exception:  # noqa: BLE001 — fora do Streamlit ou sessão indisponível
         pass
@@ -45,12 +95,18 @@ def get_image_model() -> str:
     return os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1").strip() or "gpt-image-1"
 
 
-def get_client() -> OpenAI:
-    api_key = get_api_key()
+def get_client(provider: str | None = None) -> OpenAI:
+    prov = (provider or get_provider()).strip().lower()
+    api_key = get_api_key(prov)
     if not api_key:
+        label = provider_label(prov)
+        env_name = "GEMINI_API_KEY" if prov == "gemini" else "OPENAI_API_KEY"
         raise RuntimeError(
-            "OPENAI_API_KEY não configurada. Copie .env.example para .env e preencha a chave."
+            f"{env_name} não configurada para {label}. "
+            "Copie .env.example para .env e preencha a chave."
         )
+    if prov == "gemini":
+        return OpenAI(api_key=api_key, base_url=GEMINI_OPENAI_BASE_URL)
     return OpenAI(api_key=api_key)
 
 
@@ -73,7 +129,9 @@ def chat_completion(
     response = client.chat.completions.create(**kwargs)
     content = response.choices[0].message.content
     if not content:
-        raise RuntimeError("A API da OpenAI retornou resposta vazia.")
+        raise RuntimeError(
+            f"A API de {provider_label()} retornou resposta vazia."
+        )
     return content.strip()
 
 
@@ -83,10 +141,16 @@ def gerar_imagem_png(
     destino: Path | None = None,
     size: str = "1536x1024",
 ) -> bytes:
-    """Gera PNG via Images API (ChatGPT / gpt-image / DALL·E)."""
+    """Gera PNG via Images API da OpenAI (independente do provedor de chat)."""
     import base64
 
-    client = get_client()
+    api_key = get_openai_api_key()
+    if not api_key:
+        raise RuntimeError(
+            "Geração de imagem requer OPENAI_API_KEY no .env "
+            "(não disponível via Gemini nesta app)."
+        )
+    client = OpenAI(api_key=api_key)
     model = get_image_model()
     kwargs: dict[str, Any] = {
         "model": model,
@@ -118,3 +182,8 @@ def gerar_imagem_png(
         destino.parent.mkdir(parents=True, exist_ok=True)
         destino.write_bytes(raw)
     return raw
+
+
+# Reexport útil para UI
+def modelos_do_provedor_ativo() -> list[str]:
+    return lista_ids_ordenados(get_provider())

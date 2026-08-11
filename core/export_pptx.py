@@ -59,7 +59,7 @@ def _texto_fontes(caminhos: list[Path], *, max_chars: int = 60000) -> str:
 
 def gerar_outline_slides(caminhos: list[Path], especificacoes: str = "") -> dict[str, Any]:
     if not get_api_key():
-        raise RuntimeError("OPENAI_API_KEY não configurada.")
+        raise RuntimeError("Chave de API do provedor LLM não configurada.")
     from core.especificacoes_llm import anexar_especificacoes
 
     fontes = _texto_fontes(caminhos)

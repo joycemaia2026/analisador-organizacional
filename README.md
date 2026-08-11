@@ -1,5 +1,7 @@
 # BriefBoard - Gedanken
 
+**Versão 5**
+
 Aplicação Streamlit que transforma currículos em perfis analíticos e conduz o fluxo **ata → análise → comparativa → resumo → studio**.
 
 Documentação completa: ver [`ESPECIFICACAO.md`](ESPECIFICACAO.md).
@@ -8,7 +10,7 @@ Documentação completa: ver [`ESPECIFICACAO.md`](ESPECIFICACAO.md).
 
 1. Lê os currículos em `pessoas/*.txt` e gera perfis em `perfis/perfis.json`
 2. **Gerar Ata** — transcrição → ata (especialistas, NLP, perguntas rápidas; DOCX/PDF em `outputs/`)
-3. **Análise Organizacional** — um ou mais Tomadores + lentes + Especialista IA
+3. **Análise Institucional** — um ou mais Tomadores + lentes + Especialista IA
 4. **Análise Comparativa** (opcional) — contraste técnico entre as vozes
 5. **Resumo** — pacote `resumo_*.docx` com as etapas da sessão
 6. **Studio / NotebookLM** — login Google → slide deck + infográfico; fallback PPTX/infográfico locais
@@ -31,7 +33,8 @@ python -m playwright install chromium
 ./scripts/install_playwright_deps.sh   # libs locais (sem sudo)
 ./scripts/install_chrome_wsl.sh        # Google Chrome Linux (login NotebookLM)
 cp .env.example .env
-# Edite .env e preencha OPENAI_API_KEY
+# Edite .env e preencha OPENAI_API_KEY e/ou GEMINI_API_KEY
+# (na UI, escolha o provedor no topo)
 ```
 
 ## Executar
@@ -57,7 +60,7 @@ outputs/               # Relatórios .docx / pptx / png
 ## Jornadas
 
 1. **Gerar Ata**
-2. **Análise Organizacional**
+2. **Análise Institucional**
 3. **Análise Comparativa** (opcional)
 4. **Resumo** — consolidação com fontes
 5. **Studio / NotebookLM** — comunicação visual

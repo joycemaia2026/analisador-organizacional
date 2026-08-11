@@ -1,4 +1,4 @@
-"""Jornada 2 — Análise Organizacional (Tomador + Especialista + lentes)."""
+"""Jornada 2 — Análise Institucional (Tomador + Especialista + lentes)."""
 
 from __future__ import annotations
 
@@ -174,7 +174,7 @@ def _painel_atualizar_personas(perfis: list[dict]) -> None:
                 help="Converte automaticamente os .txt novos encontrados na pasta pessoas/",
             ):
                 if not get_api_key():
-                    st.error("Configure `OPENAI_API_KEY` no `.env`.")
+                    st.error("Configure a chave do provedor LLM no `.env`.")
                     return
                 status = st.empty()
                 try:
@@ -203,7 +203,7 @@ def _painel_atualizar_personas(perfis: list[dict]) -> None:
                 help="Relê a pasta pessoas/ e regenera os perfis já cadastrados",
             ):
                 if not get_api_key():
-                    st.error("Configure `OPENAI_API_KEY` no `.env`.")
+                    st.error("Configure a chave do provedor LLM no `.env`.")
                     return
                 status = st.empty()
                 try:
@@ -235,7 +235,7 @@ def render() -> None:
         st.session_state.perfis_cache_bust = 0
 
     if not get_api_key():
-        st.warning("Configure `OPENAI_API_KEY` no `.env`.")
+        st.warning("Configure a chave do provedor LLM no `.env`.")
 
     with st.spinner("Carregando tomadores…"):
         try:
@@ -275,6 +275,13 @@ def render() -> None:
     if not perfis_sel:
         st.warning("Selecione ao menos um Tomador de Decisão.")
         return
+
+    incluir_manual_voz = st.checkbox(
+        "Incluir Manual de Voz Gedanken (além das personas)",
+        value=True,
+        key="jornada_analise_manual_voz",
+        help="Injeta docs/voz-gedanken.md no system prompt junto com o perfil do Tomador.",
+    )
 
     lentes_sel = st.multiselect(
         "Lentes de continuidade",
@@ -327,7 +334,7 @@ def render() -> None:
             st.error("Informe um problema ou anexe/gere pelo menos um documento.")
             return
         if not get_api_key():
-            st.error("OPENAI_API_KEY não configurada.")
+            st.error("Chave de API do provedor LLM não configurada.")
             return
 
         resultados: list[dict] = []
@@ -348,6 +355,7 @@ def render() -> None:
                     documentos=docs_bloco,
                     lentes=lentes_ativas,
                     especificacoes=especificacoes,
+                    incluir_manual_voz=incluir_manual_voz,
                 )
             except Exception as exc:  # noqa: BLE001
                 progresso.empty()
@@ -368,6 +376,7 @@ def render() -> None:
                     documentos=docs_bloco,
                     lentes=lentes_ativas,
                     especificacoes=especificacoes,
+                    incluir_manual_voz=incluir_manual_voz,
                 )
             except Exception as exc:  # noqa: BLE001
                 st.warning(f"Especialista indisponível para {nome}: {exc}")

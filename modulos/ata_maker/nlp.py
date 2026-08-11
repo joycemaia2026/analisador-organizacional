@@ -84,23 +84,45 @@ def _frases(text: str) -> list[str]:
 
 
 def _detectar_falantes(text: str) -> list[dict]:
-    """Conta falas no padrão 'Nome:' no início de linha."""
-    contagem: Counter[str] = Counter()
-    for linha in (text or "").splitlines():
-        m = re.match(r"^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s.'-]{1,40})\s*:\s+\S", linha)
-        if not m:
-            continue
-        nome = m.group(1).strip()
-        if len(nome.split()) > 5:
-            continue
-        baixo = nome.lower()
-        if baixo in {"http", "https", "www", "timestamp", "speaker"}:
-            continue
-        contagem[nome] += 1
-    return [
-        {"falante": nome, "falas": n}
-        for nome, n in contagem.most_common(12)
-    ]
+    """Conta falas por falante, nos três formatos de transcrição do projeto.
+
+    Delega para `normalizacao.segmentar_turnos`. O regex 'Nome:' que existia aqui
+    casava quebras de linha no meio da frase de uma transcrição de ASR e produzia
+    falantes inexistentes ('assim', 'pra gente') — o parser de lá exige nome
+    capitalizado e só usa o padrão 'Nome:' quando ele domina o arquivo.
+    """
+    from modulos.ata_maker.normalizacao import (
+        aplicar_sugestoes,
+        contar_falas,
+        segmentar_turnos,
+        sugerir_falantes,
+    )
+
+    turnos = segmentar_turnos(text)
+    if not turnos:
+        return []
+    nomes = _nomes_conhecidos()
+    if nomes:
+        aplicar_sugestoes(turnos, sugerir_falantes(turnos, nomes))
+    return contar_falas(turnos)
+
+
+def _nomes_conhecidos() -> list[str]:
+    """Nomes dos perfis já cadastrados, usados como âncora da atribuição."""
+    try:
+        from core.utils import PERFIS_JSON, load_json
+
+        if not PERFIS_JSON.exists():
+            return []
+        dados = load_json(PERFIS_JSON)
+        registros = dados if isinstance(dados, list) else list(dados.values())
+        return [
+            str(p["nome"]).strip()
+            for p in registros
+            if isinstance(p, dict) and str(p.get("nome") or "").strip()
+        ]
+    except Exception:  # noqa: BLE001 — atribuição é acessória, não pode derrubar a ata
+        return []
 
 
 def analyze_sentiment(text: str) -> dict:
@@ -252,7 +274,18 @@ def _estatisticas(text: str, tokens: list[str]) -> dict:
             {"bigrama": b, "count": c} for b, c in bigrams.most_common(12)
         ],
         "falantes": _detectar_falantes(text),
+        "turnos": _contar_turnos(text),
     }
+
+
+def _contar_turnos(text: str) -> int:
+    """Quantos blocos de fala existem, mesmo sem saber de quem são."""
+    try:
+        from modulos.ata_maker.normalizacao import segmentar_turnos
+
+        return len(segmentar_turnos(text))
+    except Exception:  # noqa: BLE001
+        return 0
 
 
 def run_nlp_analysis(text: str) -> dict:
@@ -323,10 +356,18 @@ def nlp_para_markdown(nlp: dict) -> str:
             linhas.append(f"- {a['palavra']} ({a['count']})")
 
     falantes = stats.get("falantes") or []
-    if falantes:
+    turnos = stats.get("turnos") or 0
+    if falantes or turnos:
         linhas.extend(["", "### Falantes detectados"])
+        if turnos:
+            linhas.append(f"- Turnos de fala identificados: **{turnos}**")
         for f in falantes[:8]:
             linhas.append(f"- {f['falante']}: {f['falas']} falas")
+        if turnos and not falantes:
+            linhas.append(
+                "- Nenhum falante nomeado na transcrição — atribuição de dono "
+                "precisa ser confirmada manualmente."
+            )
 
     polarizadas = sent.get("polarized_sentences") or []
     if polarizadas:

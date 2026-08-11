@@ -105,7 +105,7 @@ def montar_prompt_infografico(dados: dict) -> str:
     saidas = list(dados.get("saidas") or [])
     modulos = list(dados.get("modulos") or [])
     return PROMPT_INFOGRAFICO_BASE.format(
-        titulo=str(dados.get("titulo") or "Análise Organizacional").strip(),
+        titulo=str(dados.get("titulo") or "Análise Institucional").strip(),
         fonte_1_nome=_item(fontes, 0, "nome"),
         fonte_1_sub=_item(fontes, 0, "subtitulo"),
         fonte_2_nome=_item(fontes, 1, "nome"),

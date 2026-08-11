@@ -39,7 +39,10 @@ def check_health() -> HealthStatus:
     return HealthStatus(
         online=False,
         openai_configured=False,
-        message="Configure OPENAI_API_KEY no .env para usar o módulo Ata.",
+        message=(
+            "Configure OPENAI_API_KEY e/ou GEMINI_API_KEY no .env "
+            "e escolha o provedor no topo."
+        ),
     )
 
 
@@ -51,6 +54,7 @@ def gerar_ata_de_transcricao(
     personas: list[str] | None = None,
     incluir_nlp: bool = True,
     especificacoes: str = "",
+    incluir_manual_voz: bool = False,
 ) -> AtaGerada:
     _ = source_filename
     return gerar_ata(
@@ -59,4 +63,5 @@ def gerar_ata_de_transcricao(
         personas=personas,
         incluir_nlp=incluir_nlp,
         especificacoes=especificacoes,
+        incluir_manual_voz=incluir_manual_voz,
     )
