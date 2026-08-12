@@ -6,8 +6,8 @@
 | Marca | Gedanken |
 | Nome na UI | BriefBoard |
 | Slogan | Da ata à decisão — com a lente de quem lidera. |
-| Versão do documento | 5 |
-| Data | 2026-08-10 |
+| Versão do documento | 6 |
+| Data | 2026-08-12 |
 | Tipo | Especificação funcional e técnica |
 | Repositório | https://github.com/joycemaia2026/analisador-organizacional |
 | Pasta do projeto | `/home/joyce/projetos/briefboard` |
@@ -177,7 +177,8 @@ Cada seção de conteúdo (exceto Fontes) termina com `Fonte: …`. Não inventa
 | Caminho | Comportamento |
 |---------|----------------|
 | NotebookLM | Login Chrome a cada pedido → upload → slide deck + infográfico (`notebooklm-py`) |
-| Local | PPTX + infográfico PNG via OpenAI (independente do Google) |
+| Local (padrão) | Skills `apresentacao-visual` (PPTX 16:9 via `python-pptx`) e `infografico-visual` (HTML responsivo) |
+| Local (legado) | Infográfico PNG 16:9 via Images API (opcional) |
 
 Riscos: API não oficial; UI/quota Google; precisa display (WSLg).
 

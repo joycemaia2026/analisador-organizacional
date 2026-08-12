@@ -12,8 +12,12 @@ from typing import Any
 from core.documentos import extrair_texto_arquivo
 from core.openai_client import chat_completion, gerar_imagem_png, get_api_key
 from core.prompt_infografico import (
-    SYSTEM_EXTRAIR_CONTEUDO,
-    montar_prompt_infografico,
+    PUBLICO_PADRAO,
+    montar_prompt_visual,
+    montar_system_roteiro,
+    montar_user_roteiro,
+    titulo_completo,
+    validar_roteiro,
 )
 from core.utils import OUTPUTS_DIR, ensure_dirs
 
@@ -47,9 +51,17 @@ def _texto_fontes(caminhos: list[Path], *, max_chars: int = 50000) -> str:
 
 
 def gerar_estrutura_infografico(
-    caminhos: list[Path], especificacoes: str = ""
+    caminhos: list[Path],
+    especificacoes: str = "",
+    *,
+    publico: str = PUBLICO_PADRAO,
+    idioma: str = "pt-BR",
 ) -> dict[str, Any]:
-    """Extrai conteúdo estruturado das fontes (para preencher o prompt visual)."""
+    """Extrai o roteiro das fontes, reancorado no arco canônico de 6 casas.
+
+    Serve qualquer gênero de documento — a estrutura do poster vem do arco, não
+    da estrutura da fonte.
+    """
     if not get_api_key():
         raise RuntimeError("OPENAI_API_KEY não configurada.")
     from core.especificacoes_llm import anexar_especificacoes
@@ -58,14 +70,11 @@ def gerar_estrutura_infografico(
     if not fontes.strip():
         raise ValueError("Fontes vazias.")
     user = anexar_especificacoes(
-        "Com base nas fontes abaixo, preencha o JSON do infográfico "
-        "(arquitetura de produto / análise institucional).\n\n"
-        f"{fontes}",
-        especificacoes,
+        montar_user_roteiro(fontes, publico=publico), especificacoes
     )
     resp = chat_completion(
         [
-            {"role": "system", "content": SYSTEM_EXTRAIR_CONTEUDO},
+            {"role": "system", "content": montar_system_roteiro(idioma)},
             {"role": "user", "content": user},
         ],
         temperature=0.3,
@@ -74,10 +83,28 @@ def gerar_estrutura_infografico(
     return _extrair_json(resp)
 
 
-def montar_html_preview(dados: dict[str, Any], prompt_usado: str) -> str:
+def montar_html_preview(
+    dados: dict[str, Any],
+    prompt_usado: str,
+    problemas: list[str] | None = None,
+) -> str:
     """HTML leve com o conteúdo + prompt (referência; a entrega principal é o PNG)."""
-    titulo = html.escape(str(dados.get("titulo") or "Infográfico"))
+    titulo = html.escape(titulo_completo(dados))
     prompt_esc = html.escape(prompt_usado)
+    avisos = ""
+    if problemas:
+        itens = "".join(f"<li>{html.escape(p)}</li>" for p in problemas)
+        avisos = (
+            '<div class="avisos"><strong>Roteiro com pendências</strong>'
+            f"<ul>{itens}</ul></div>"
+        )
+    lacunas_lista = [str(x) for x in (dados.get("lacunas") or []) if str(x).strip()]
+    if lacunas_lista:
+        itens = "".join(f"<li>{html.escape(x)}</li>" for x in lacunas_lista)
+        avisos += (
+            '<div class="avisos"><strong>Lacunas da fonte</strong>'
+            f"<ul>{itens}</ul></div>"
+        )
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -96,10 +123,16 @@ def montar_html_preview(dados: dict[str, Any], prompt_usado: str) -> str:
     border-radius: 12px; padding: 16px; font-size: 12px; line-height: 1.45;
   }}
   .brand {{ margin-top: 20px; font-size: 13px; color: #0050A0; }}
+  .avisos {{
+    background: #FFF6E5; border: 1px solid #F0C97A; border-radius: 12px;
+    padding: 12px 16px; margin-bottom: 16px; font-size: 13px;
+  }}
+  .avisos ul {{ margin: 8px 0 0; padding-left: 20px; }}
 </style>
 </head>
 <body>
   <h1>{titulo}</h1>
+  {avisos}
   <p>Prompt enviado ao ChatGPT Images (16:9 corporativo).</p>
   <pre>{prompt_esc}</pre>
   <div class="brand">Gedanken · BriefBoard</div>
@@ -109,18 +142,29 @@ def montar_html_preview(dados: dict[str, Any], prompt_usado: str) -> str:
 
 
 def gerar_infografico(
-    caminhos: list[Path], especificacoes: str = ""
+    caminhos: list[Path],
+    especificacoes: str = "",
+    *,
+    publico: str = PUBLICO_PADRAO,
+    idioma: str = "pt-BR",
 ) -> tuple[Path, Path]:
     """
-    1) ChatGPT extrai conteúdo das fontes
-    2) Monta o prompt visual corporativo 16:9
-    3) Images API gera o PNG
+    1) O LLM extrai o roteiro das fontes, reancorado no arco de 6 casas
+    2) O roteiro é validado (texto repetido, grafia, limites) — pendências viram aviso
+    3) O roteiro vira prompt visual 16:9
+    4) Images API gera o PNG
 
     Retorna (png_path, html_path_com_prompt).
+
+    Nota: modelo de imagem desenha letras, não escreve — o texto do PNG pode sair
+    corrompido. Para texto literal, renderize o roteiro (`.json`) em HTML.
     """
     ensure_dirs()
-    dados = gerar_estrutura_infografico(caminhos, especificacoes=especificacoes)
-    prompt = montar_prompt_infografico(dados)
+    dados = gerar_estrutura_infografico(
+        caminhos, especificacoes=especificacoes, publico=publico, idioma=idioma
+    )
+    problemas = validar_roteiro(dados)
+    prompt = montar_prompt_visual(dados)
     if (especificacoes or "").strip():
         prompt = (
             f"{prompt.rstrip()}\n\n"
@@ -132,8 +176,14 @@ def gerar_infografico(
     html_path = OUTPUTS_DIR / f"infografico_{stamp}.html"
     png_path = OUTPUTS_DIR / f"infografico_{stamp}.png"
     prompt_path = OUTPUTS_DIR / f"infografico_{stamp}_prompt.txt"
+    roteiro_path = OUTPUTS_DIR / f"infografico_{stamp}_roteiro.json"
 
     prompt_path.write_text(prompt, encoding="utf-8")
-    html_path.write_text(montar_html_preview(dados, prompt), encoding="utf-8")
+    roteiro_path.write_text(
+        json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    html_path.write_text(
+        montar_html_preview(dados, prompt, problemas), encoding="utf-8"
+    )
     gerar_imagem_png(prompt, destino=png_path)
     return png_path, html_path

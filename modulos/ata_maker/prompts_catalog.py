@@ -168,6 +168,37 @@ def load_default_prompt() -> str:
     return path.read_text(encoding="utf-8")
 
 
+# Modelos de ata do modo "prompt". Cada chave aponta para um arquivo em prompts/.
+# 'padrao' é o relatório de oportunidades de automação que já existia.
+MODELOS_ATA: list[tuple[str, str, str]] = [
+    (
+        "padrao",
+        "Oportunidades e automação",
+        "Relatório completo: gargalos, processos manuais, quick wins e roadmap.",
+    ),
+    (
+        "reuniao",
+        "Ata de reunião (overview)",
+        "Registro factual em ~1 página: decisões, pendências com dono e prazo, "
+        "e o que dá para fazer com o time atual.",
+    ),
+]
+
+_ARQUIVOS_ATA = {"padrao": "default_prompt.txt", "reuniao": "ata_reuniao.txt"}
+
+
+def load_prompt_ata(modelo: str = "padrao") -> str:
+    """Template do modelo de ata escolhido. Modelo desconhecido cai no padrão."""
+    arquivo = _ARQUIVOS_ATA.get(modelo or "padrao", _ARQUIVOS_ATA["padrao"])
+    path = Path(__file__).resolve().parent / "prompts" / arquivo
+    return path.read_text(encoding="utf-8")
+
+
+def listar_modelos_ata() -> list[tuple[str, str, str]]:
+    """[(chave, rótulo, descrição), ...] para a UI."""
+    return list(MODELOS_ATA)
+
+
 PERSONA_TITLES = {
     "produto": "Especialista em Produto",
     "marketing": "Especialista em Marketing",

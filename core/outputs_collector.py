@@ -25,9 +25,9 @@ def _classificar(nome: str) -> str:
         return "comparativa"
     if n.startswith("resumo_"):
         return "resumo"
-    if n.startswith("apresentacao_"):
+    if n.startswith("apresentacao_") or n.startswith("apresentacao_visual_"):
         return "apresentacao"
-    if n.startswith("infografico_"):
+    if n.startswith("infografico_visual_") or n.startswith("infografico_"):
         return "infografico"
     return "outro"
 

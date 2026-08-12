@@ -127,8 +127,7 @@ def montar_pptx(outline: dict[str, Any], destino: Path) -> Path:
 
 
 def gerar_apresentacao_pptx(caminhos: list[Path], especificacoes: str = "") -> Path:
-    ensure_dirs()
-    outline = gerar_outline_slides(caminhos, especificacoes=especificacoes)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    destino = OUTPUTS_DIR / f"apresentacao_{stamp}.pptx"
-    return montar_pptx(outline, destino)
+    """Compat: encaminha para a skill `apresentacao-visual`."""
+    from core.apresentacao_visual import gerar_apresentacao_visual
+
+    return gerar_apresentacao_visual(caminhos, especificacoes=especificacoes)

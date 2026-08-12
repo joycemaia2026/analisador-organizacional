@@ -1,6 +1,6 @@
 # BriefBoard - Gedanken
 
-**Versão 5**
+**Versão 6**
 
 Aplicação Streamlit que transforma currículos em perfis analíticos e conduz o fluxo **ata → análise → comparativa → resumo → studio**.
 
@@ -13,7 +13,7 @@ Documentação completa: ver [`ESPECIFICACAO.md`](ESPECIFICACAO.md).
 3. **Análise Institucional** — um ou mais Tomadores + lentes + Especialista IA
 4. **Análise Comparativa** (opcional) — contraste técnico entre as vozes
 5. **Resumo** — pacote `resumo_*.docx` com as etapas da sessão
-6. **Studio / NotebookLM** — login Google → slide deck + infográfico; fallback PPTX/infográfico locais
+6. **Studio / NotebookLM** — login Google → slide deck + infográfico; ou skills locais `apresentacao-visual` (PPTX) e `infografico-visual` (HTML)
 
 ## Pré-requisitos
 

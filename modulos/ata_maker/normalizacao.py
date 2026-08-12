@@ -572,6 +572,120 @@ def turnos_para_markdown(turnos: list[Turno]) -> str:
     return "\n\n".join(linhas)
 
 
+def blocos_de_tempo(turnos: list[Turno], *, minutos: int = 10) -> list[dict]:
+    """Agrupa os turnos em janelas de tempo.
+
+    Serve para ancorar "temas discutidos" em trechos reais da reunião: cada tema
+    aponta para uma janela, em vez de flutuar sobre o texto inteiro. Turno sem
+    timestamp cai na janela do turno anterior.
+    """
+    if not turnos:
+        return []
+
+    janela = max(1, minutos) * 60
+    blocos: list[dict] = []
+    atual_seg = 0
+    for turno in turnos:
+        if turno.inicio_seg is not None:
+            atual_seg = turno.inicio_seg
+        indice = atual_seg // janela
+        if not blocos or blocos[-1]["indice"] != indice:
+            blocos.append(
+                {
+                    "indice": indice,
+                    "inicio_seg": indice * janela,
+                    "inicio": formatar_ancora(indice * janela),
+                    "fim": formatar_ancora((indice + 1) * janela),
+                    "turnos": [],
+                    "falantes": [],
+                }
+            )
+        blocos[-1]["turnos"].append(turno.indice)
+        if turno.falante and turno.falante not in blocos[-1]["falantes"]:
+            blocos[-1]["falantes"].append(turno.falante)
+
+    for bloco in blocos:
+        bloco["total_turnos"] = len(bloco["turnos"])
+    return blocos
+
+
+def resumo_estrutural(turnos: list[Turno], nomes_conhecidos: list[str] | None = None) -> dict:
+    """Fatos do cabeçalho de uma ata — todos derivados, nenhum inferido.
+
+    `duracao_seg` é o início do último turno, não o fim da reunião: a transcrição
+    não diz quando a última fala terminou. Por isso o rótulo é "pelo menos".
+    """
+    if not turnos:
+        return {
+            "duracao_seg": None,
+            "duracao_texto": "não determinada",
+            "participantes": [],
+            "citados_sem_falar": [],
+            "total_turnos": 0,
+            "turnos_sem_falante": 0,
+        }
+
+    participantes = [f["falante"] for f in contar_falas(turnos)]
+
+    # Quem aparece na fala mas nunca falou: esteve na pauta, não na reunião.
+    citados: list[str] = []
+    if nomes_conhecidos:
+        corpo = " ".join(t.texto for t in turnos)
+        presentes = {_sem_acento(p) for p in participantes}
+        for nome in nomes_conhecidos:
+            primeiro = nome.split()[0]
+            if _sem_acento(nome) in presentes or _sem_acento(primeiro) in presentes:
+                continue
+            padrao = rf"(?<![\wÀ-ÿ]){re.escape(primeiro)}(?![\wÀ-ÿ])"
+            if re.search(padrao, corpo, flags=re.IGNORECASE) and nome not in citados:
+                citados.append(nome)
+
+    ultimo = max((t.inicio_seg for t in turnos if t.inicio_seg is not None), default=None)
+    return {
+        "duracao_seg": ultimo,
+        "duracao_texto": (
+            f"pelo menos {formatar_ancora(ultimo)}" if ultimo else "não determinada"
+        ),
+        "participantes": participantes,
+        "citados_sem_falar": citados,
+        "total_turnos": len(turnos),
+        "turnos_sem_falante": sum(1 for t in turnos if not t.falante),
+    }
+
+
+def bloco_fatos_reuniao(texto: str, nomes_conhecidos: list[str] | None = None) -> str:
+    """Cabeçalho factual pronto para injetar num prompt de ata.
+
+    Existe para que o modelo **não precise inventar** data, duração ou lista de
+    participantes: ele recebe o que foi medido e o que ficou indeterminado.
+
+    Corrige os nomes do ASR antes de medir. Sem isso o cabeçalho diverge do resto:
+    o vocativo 'Linda,' não casaria com a 'Lindia' do cadastro e ela sumiria da
+    lista de participantes.
+    """
+    nomes = list(nomes_conhecidos or [])
+    corrigido = corrigir_nomes_asr(texto, nomes).texto
+    turnos = segmentar_turnos(corrigido)
+    aplicar_sugestoes(turnos, sugerir_falantes(turnos, nomes))
+    meta = extrair_metadados_cabecalho(texto)
+    resumo = resumo_estrutural(turnos, nomes)
+
+    participantes = ", ".join(resumo["participantes"]) or "nenhum identificado"
+    citados = ", ".join(resumo["citados_sem_falar"]) or "nenhum"
+    return "\n".join(
+        [
+            f"- Título da gravação: {meta['titulo'] or 'não informado'}",
+            f"- Data/hora: {meta['data_reuniao'] or 'não informada'}"
+            + (f" ({meta['fuso']})" if meta["fuso"] else ""),
+            f"- Duração: {resumo['duracao_texto']}",
+            f"- Turnos de fala: {resumo['total_turnos']} "
+            f"({resumo['turnos_sem_falante']} sem falante identificado)",
+            f"- Participantes identificados: {participantes}",
+            f"- Citados que não falaram: {citados}",
+        ]
+    )
+
+
 def contar_falas(turnos: list[Turno]) -> list[dict]:
     """Contagem por falante, no formato que `nlp.py` já publica na ata."""
     contagem: dict[str, int] = {}

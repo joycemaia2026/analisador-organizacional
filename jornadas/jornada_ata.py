@@ -8,7 +8,13 @@ from pathlib import Path
 
 import streamlit as st
 
-from core.ata_maker_client import check_health, gerar_ata_de_transcricao, listar_especialistas
+from core.ata_maker_client import (
+    aplicar_skills_na_transcricao,
+    check_health,
+    gerar_ata_de_transcricao,
+    listar_especialistas,
+    listar_skills_disponiveis,
+)
 from core.documentos import TIPOS_UPLOAD, anexar_documento_sessao, extrair_texto_arquivo
 from core.especificacoes_llm import campo_especificacoes_llm
 from core.export_docx import markdown_para_docx_bytes, salvar_markdown_como_docx
@@ -17,7 +23,7 @@ from core.nlp_painel import render_painel_nlp
 from core.openai_client import get_api_key
 from core.utils import OUTPUTS_DIR, ensure_dirs
 from jornadas.comum import render_cabecalho
-from modulos.ata_maker.perguntas import SUGESTOES, responder_pergunta_transcricao
+from modulos.ata_maker.perguntas import SUGESTOES, responder_perguntas_transcricao
 from modulos.ata_maker.nlp import run_nlp_analysis
 
 
@@ -110,7 +116,7 @@ def _resolver_transcricao(transcricao_file, transcricao_texto: str) -> tuple[str
 
 
 def _painel_perguntas_rapidas(transcricao: str, *, online: bool) -> None:
-    """Q&A rápido ancorado na transcrição."""
+    """Q&A rápido ancorado na transcrição (multiseleção de sugestões)."""
     st.divider()
     st.subheader("Perguntas rápidas sobre a transcrição")
     st.caption(
@@ -120,47 +126,69 @@ def _painel_perguntas_rapidas(transcricao: str, *, online: bool) -> None:
 
     if "qa_historico" not in st.session_state:
         st.session_state.qa_historico = []
+    if "qa_sugestoes_sel" not in st.session_state:
+        st.session_state.qa_sugestoes_sel = []
 
     if not transcricao.strip():
         st.info("Envie ou cole a transcrição acima para liberar as perguntas.")
         return
 
-    cols = st.columns(len(SUGESTOES))
-    for i, sugestao in enumerate(SUGESTOES):
-        with cols[i]:
-            if st.button(sugestao, key=f"qa_sug_{i}", use_container_width=True):
-                st.session_state["qa_pergunta_input"] = sugestao
-                st.rerun()
+    selecionadas = st.multiselect(
+        "Sugestões (pode marcar várias)",
+        options=list(SUGESTOES),
+        key="qa_sugestoes_sel",
+        help="Marque uma ou mais. A resposta cobre todas de uma vez.",
+    )
 
-    pergunta = st.text_input(
-        "Sua pergunta",
+    pergunta_livre = st.text_input(
+        "Pergunta extra (opcional)",
         placeholder="Ex.: Quem ficou responsável pelo prazo do projeto?",
         key="qa_pergunta_input",
     )
 
-    c1, c2 = st.columns([1, 1])
+    perguntas_envio = list(selecionadas)
+    livre = (pergunta_livre or "").strip()
+    if livre and livre not in perguntas_envio:
+        perguntas_envio.append(livre)
+
+    c1, c2, c3 = st.columns([1, 1, 1])
     with c1:
         perguntar = st.button(
             "Perguntar",
             type="primary",
-            disabled=not online or not pergunta.strip(),
+            disabled=not online or not perguntas_envio,
             key="qa_btn_perguntar",
         )
     with c2:
+        if st.button("Limpar seleção", key="qa_btn_limpar_sel"):
+            st.session_state.qa_sugestoes_sel = []
+            st.session_state.qa_pergunta_input = ""
+            st.rerun()
+    with c3:
         if st.button("Limpar histórico de perguntas", key="qa_btn_limpar"):
             st.session_state.qa_historico = []
             st.rerun()
 
     if perguntar:
+        rotulo = (
+            perguntas_envio[0]
+            if len(perguntas_envio) == 1
+            else f"{len(perguntas_envio)} perguntas selecionadas"
+        )
         with st.spinner("Respondendo com base na transcrição…"):
             try:
-                resposta = responder_pergunta_transcricao(
+                resposta = responder_perguntas_transcricao(
                     transcricao,
-                    pergunta,
+                    perguntas_envio,
                     historico=st.session_state.qa_historico,
                 )
                 st.session_state.qa_historico.append(
-                    {"pergunta": pergunta.strip(), "resposta": resposta}
+                    {
+                        "pergunta": rotulo
+                        if len(perguntas_envio) == 1
+                        else " · ".join(perguntas_envio),
+                        "resposta": resposta,
+                    }
                 )
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Falha ao responder: {exc}")
@@ -266,14 +294,71 @@ def render() -> None:
         "1. Gerar Ata",
         value=True,
         key="jornada_ata_opt_gerar",
+        help=(
+            "Ata assertiva para o leitor: levantamento + registro factual "
+            "(decisões, donos, prazos). A preparação da transcrição roda automaticamente."
+        ),
     )
-    st.checkbox(
+    if opt_gerar:
+        st.caption(
+            "Formato: em uma frase → decisões → pendências com dono/prazo → "
+            "leitura de startup. Prioriza assertividade (400–600 palavras)."
+        )
+
+    opt_skills = st.checkbox(
         "2. Aplicar Skills",
         value=False,
         key="jornada_ata_opt_skills",
-        disabled=True,
-        help="Em breve: apontar pasta de skills.",
+        help=(
+            "Pipeline complementar: levantamento, pontos de ação, "
+            "resumo de decisões, próxima reunião. "
+            "A preparação da transcrição roda automaticamente; a ata está em Gerar Ata."
+        ),
     )
+
+    skills_catalogo = listar_skills_disponiveis()
+    skills_ids = [s.name for s in skills_catalogo]
+    skills_rotulos = {s.name: s.rotulo for s in skills_catalogo}
+    skills_sel: list[str] = []
+    if opt_skills:
+        if not skills_ids:
+            st.warning("Nenhuma skill encontrada em `skills/`.")
+        else:
+            st.markdown("#### Skills do BriefBoard")
+            c_sk_all, c_sk_clear = st.columns(2)
+            with c_sk_all:
+                if st.button(
+                    "Selecionar todas",
+                    key="btn_skills_todos",
+                    use_container_width=True,
+                ):
+                    st.session_state["jornada_ata_skills_sel"] = list(skills_ids)
+                    st.rerun()
+            with c_sk_clear:
+                if st.button(
+                    "Limpar skills",
+                    key="btn_skills_limpar",
+                    use_container_width=True,
+                ):
+                    st.session_state["jornada_ata_skills_sel"] = []
+                    st.rerun()
+            if "jornada_ata_skills_sel" not in st.session_state:
+                st.session_state["jornada_ata_skills_sel"] = []
+            # Remove infra/fundidas de sessões antigas; não pré-seleciona nada.
+            st.session_state["jornada_ata_skills_sel"] = [
+                n
+                for n in st.session_state.get("jornada_ata_skills_sel", [])
+                if n in skills_ids
+            ]
+            skills_sel = st.multiselect(
+                "Selecione as skills",
+                options=skills_ids,
+                format_func=lambda n: skills_rotulos.get(n, n),
+                key="jornada_ata_skills_sel",
+            )
+            if not skills_sel:
+                st.warning("Selecione ao menos uma skill.")
+
     opt_especialistas = st.checkbox(
         "3. Visão de Especialistas",
         value=False,
@@ -314,14 +399,13 @@ def render() -> None:
         if not especialistas_sel:
             st.warning("Selecione ao menos um especialista para a visão de especialistas.")
 
-        incluir_manual_voz = st.checkbox(
-            "Incluir Manual de Voz Gedanken",
-            value=True,
-            key="jornada_ata_opt_manual_voz",
-            help="Injeta docs/voz-gedanken.md no system prompt junto com as personas.",
-        )
-    else:
-        incluir_manual_voz = False
+    # A voz da marca vale para qualquer saída, não só para as personas.
+    incluir_manual_voz = st.checkbox(
+        "Incluir Manual de Voz Gedanken",
+        value=True,
+        key="jornada_ata_opt_manual_voz",
+        help="Injeta docs/voz-gedanken.md no system prompt da geração.",
+    )
 
     modo_ata = "full" if opt_especialistas else "prompt"
 
@@ -335,11 +419,12 @@ def render() -> None:
 
     gerar_ok = (
         health.online
-        and opt_gerar
-        and (not opt_especialistas or bool(especialistas_sel))
+        and (opt_gerar or opt_skills)
+        and (not opt_gerar or not opt_especialistas or bool(especialistas_sel))
+        and (not opt_skills or bool(skills_sel))
     )
     if st.button(
-        "Gerar ata",
+        "Executar etapas",
         type="primary",
         disabled=not gerar_ok,
     ):
@@ -355,36 +440,152 @@ def render() -> None:
             st.error("Envie ou cole uma transcrição.")
             return
 
-        with st.spinner("Gerando ata com o módulo local…"):
-            try:
-                ata = gerar_ata_de_transcricao(
-                    bruto,
-                    source_filename=nome_fonte,
-                    modo=modo_ata,
-                    personas=especialistas_sel if opt_especialistas else None,
-                    incluir_nlp=incluir_nlp,
-                    especificacoes=especificacoes,
-                    incluir_manual_voz=incluir_manual_voz,
-                )
-                nome_ata = f"ata_gerada_{Path(nome_fonte).stem}.md"
-                if ata.nlp:
-                    st.session_state["ultimo_nlp"] = ata.nlp
-                if preparar_analise:
-                    _preparar_para_analise(ata.texto, nome_ata)
-                    st.success(
-                        "Ata gerada e preparada para a Análise "
-                        "(permanece nesta jornada). Use **2 · Análise Institucional** quando quiser."
+        if opt_skills and skills_sel:
+            status_box = st.empty()
+
+            def _prog(msg: str) -> None:
+                status_box.info(msg)
+
+            with st.spinner("Aplicando skills…"):
+                try:
+                    pipe = aplicar_skills_na_transcricao(
+                        bruto,
+                        source_filename=nome_fonte,
+                        skills=skills_sel,
+                        incluir_manual_voz=incluir_manual_voz,
+                        progress=_prog,
                     )
-                else:
-                    _registrar_ata(nome_ata, ata.texto)
+                    st.session_state["ultimo_skills_pipeline"] = {
+                        "stem": pipe.stem,
+                        "pasta": pipe.pasta,
+                        "erros": pipe.erros,
+                        "skills": [
+                            {
+                                "name": s.name,
+                                "ok": s.ok,
+                                "erro": s.erro,
+                                "avisos": s.avisos,
+                                "caminhos": s.caminhos,
+                                "markdown": s.markdown,
+                            }
+                            for s in pipe.skills
+                        ],
+                    }
+                    ok_n = sum(1 for s in pipe.skills if s.ok)
                     st.success(
-                        "Ata gerada, anexada e salva em `outputs/`. "
-                        "Use o botão abaixo ou a jornada **2 · Análise Institucional**."
+                        f"Skills: {ok_n}/{len(pipe.skills)} ok · "
+                        f"artefatos em `{pipe.pasta}`."
                     )
-                if ata.erros:
-                    st.warning("Avisos: " + "; ".join(ata.erros))
-            except Exception as exc:  # noqa: BLE001
-                st.error(f"Falha ao gerar ata: {exc}")
+                    avisos_estrutura = [
+                        e
+                        for e in (pipe.erros or [])
+                        if "não cabe à análise estruturada" in e
+                    ]
+                    if avisos_estrutura:
+                        st.error(
+                            "A estrutura desta reunião não cabe à análise estruturada "
+                            "(menos de 50% das informações necessárias). "
+                            + " · ".join(avisos_estrutura)
+                        )
+                    elif pipe.erros:
+                        st.warning("Avisos skills: " + "; ".join(pipe.erros))
+                    if pipe.ata_markdown:
+                        nome_skill_ata = f"ata_skills_{pipe.stem}.md"
+                        if preparar_analise and not opt_gerar:
+                            _preparar_para_analise(pipe.ata_markdown, nome_skill_ata)
+                        else:
+                            _registrar_ata(nome_skill_ata, pipe.ata_markdown)
+                except Exception as exc:  # noqa: BLE001
+                    st.error(f"Falha ao aplicar skills: {exc}")
+                    return
+                finally:
+                    status_box.empty()
+
+        if opt_gerar:
+            status_ata = st.empty()
+
+            def _prog_ata(msg: str) -> None:
+                status_ata.info(msg)
+
+            with st.spinner("Gerando ata assertiva…"):
+                try:
+                    ata = gerar_ata_de_transcricao(
+                        bruto,
+                        source_filename=nome_fonte,
+                        modo=modo_ata,
+                        personas=especialistas_sel if opt_especialistas else None,
+                        incluir_nlp=incluir_nlp,
+                        especificacoes=especificacoes,
+                        incluir_manual_voz=incluir_manual_voz,
+                        progress=_prog_ata if modo_ata != "full" else None,
+                    )
+                    nome_ata = f"ata_gerada_{Path(nome_fonte).stem}.md"
+                    if ata.nlp:
+                        st.session_state["ultimo_nlp"] = ata.nlp
+                    if preparar_analise:
+                        _preparar_para_analise(ata.texto, nome_ata)
+                        st.success(
+                            "Ata gerada e preparada para a Análise "
+                            "(permanece nesta jornada). Use **2 · Análise Institucional** quando quiser."
+                        )
+                    else:
+                        _registrar_ata(nome_ata, ata.texto)
+                        st.success(
+                            "Ata assertiva gerada, anexada e salva em `outputs/`. "
+                            "Use o botão abaixo ou a jornada **2 · Análise Institucional**."
+                        )
+                    if ata.saved_report:
+                        st.caption(f"Cópia canônica: `{ata.saved_report}`")
+                    if ata.erros:
+                        estrutura = [
+                            e
+                            for e in ata.erros
+                            if "não cabe à análise estruturada" in e
+                        ]
+                        if estrutura:
+                            st.error(" · ".join(estrutura))
+                        outros = [e for e in ata.erros if e not in estrutura]
+                        if outros:
+                            st.warning("Avisos: " + "; ".join(outros))
+                except Exception as exc:  # noqa: BLE001
+                    st.error(f"Falha ao gerar ata: {exc}")
+                finally:
+                    status_ata.empty()
+
+    pipe_sessao = st.session_state.get("ultimo_skills_pipeline")
+    if isinstance(pipe_sessao, dict) and pipe_sessao.get("skills"):
+        st.divider()
+        st.subheader("Resultado das skills")
+        st.caption(f"Pasta: `{pipe_sessao.get('pasta')}`")
+        for item in pipe_sessao["skills"]:
+            marca = "ok" if item.get("ok") else "erro"
+            estrutura_baixa = any(
+                "não cabe à análise estruturada" in (a or "")
+                for a in (item.get("avisos") or [])
+            )
+            if estrutura_baixa:
+                marca = "estrutura inadequada"
+            with st.expander(f"{item.get('name')} · {marca}", expanded=estrutura_baixa):
+                if estrutura_baixa:
+                    st.error(
+                        next(
+                            a
+                            for a in item["avisos"]
+                            if "não cabe à análise estruturada" in a
+                        )
+                    )
+                if item.get("erro"):
+                    st.error(item["erro"])
+                if item.get("avisos"):
+                    st.warning("; ".join(item["avisos"]))
+                caminhos = item.get("caminhos") or {}
+                if caminhos:
+                    st.markdown(
+                        "Arquivos:\n"
+                        + "\n".join(f"- `{v}`" for v in caminhos.values())
+                    )
+                if item.get("markdown"):
+                    st.markdown(item["markdown"][:8000])
 
     atas = _atas_sessao()
     if atas:

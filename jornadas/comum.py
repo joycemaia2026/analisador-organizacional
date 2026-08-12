@@ -53,7 +53,7 @@ INFO_JORNADAS = {
         "passos": [
             "Envie ou cole a transcrição",
             "Faça perguntas rápidas (opcional)",
-            "Marque Gerar Ata, Especialistas e/ou NLP (Skills em breve)",
+            "Marque Gerar Ata (assertiva) e/ou Skills, Especialistas, NLP",
             "Leve o registro à jornada 2",
         ],
         "entrada": "Transcrição informal",
@@ -128,24 +128,27 @@ INFO_JORNADAS = {
     "studio": {
         "titulo": "Studio / NotebookLM",
         "objetivo": (
-            "Reunir documentos (da sessão ou do computador), enviar ao NotebookLM "
-            "e gerar apresentação PPTX e/ou infográfico."
+            "Reunir documentos e gerar apresentação + infográfico — via NotebookLM "
+            "ou pelas skills locais apresentacao-visual e infografico-visual."
         ),
         "fundamento": (
-            "Síntese visual · storytelling de decisão · grounding em fontes "
-            "(NotebookLM)."
+            "Síntese visual · storytelling de decisão · grounding em fontes."
         ),
         "lentes": (
-            "Seleção de artefatos · upload local · PPTX · infográfico."
+            "NotebookLM · skill apresentacao-visual (PPTX) · "
+            "skill infografico-visual (HTML)."
         ),
         "passos": [
             "Selecione .docx de outputs/ e/ou envie arquivos do computador",
-            "Autentique no Google e gere no NotebookLM",
-            "Ou use PPTX/infográfico locais (OpenAI) sem Google",
+            "Opção A: autentique no Google e gere no NotebookLM",
+            "Opção B: rode as skills locais (PPTX + HTML) sem Google",
             "Baixe os artefatos nesta tela",
         ],
         "entrada": ".docx/.pdf/.txt/.md de outputs/ ou upload local",
-        "saida": "Slide deck + infográfico NotebookLM (e/ou locais)",
+        "saida": (
+            "PPTX (apresentacao-visual) · HTML (infografico-visual) · "
+            "e/ou artefatos NotebookLM"
+        ),
     },
 }
 
@@ -322,7 +325,7 @@ def _barra_jornadas_topo() -> str:
 2. **Análise Institucional** — o Tomador de Decisão interpreta o problema e as atas; o Especialista IA faz o stress-test da visão.
 3. **Análise Comparativa (opcional)** — confronta as duas vozes quando o contraste agregar; pode pular sem prejuízo ao pacote final.
 4. **Resumo** — consolida as etapas da sessão em `outputs/resumo_*.docx` com TO-DO acionável.
-5. **Studio / NotebookLM** — envia artefatos de `outputs/` ou arquivos do computador ao NotebookLM e gera PPTX + infográfico.
+5. **Studio / NotebookLM** — envia artefatos de `outputs/` ou arquivos do computador ao NotebookLM **ou** gera localmente com as skills `apresentacao-visual` (PPTX) e `infografico-visual` (HTML).
 """
     )
     st.markdown("</div>", unsafe_allow_html=True)

@@ -101,13 +101,13 @@ def _detectar_falantes(text: str) -> list[dict]:
     turnos = segmentar_turnos(text)
     if not turnos:
         return []
-    nomes = _nomes_conhecidos()
+    nomes = nomes_do_cadastro()
     if nomes:
         aplicar_sugestoes(turnos, sugerir_falantes(turnos, nomes))
     return contar_falas(turnos)
 
 
-def _nomes_conhecidos() -> list[str]:
+def nomes_do_cadastro() -> list[str]:
     """Nomes dos perfis já cadastrados, usados como âncora da atribuição."""
     try:
         from core.utils import PERFIS_JSON, load_json

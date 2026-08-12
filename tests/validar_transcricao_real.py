@@ -68,7 +68,30 @@ def main() -> int:
     print(f"  total atribuídos: {len(atribuidos)}")
 
     _checar_nlp(caminho)
+    _mostrar_levantamento(caminho)
     return 0
+
+
+def _mostrar_levantamento(caminho: Path) -> None:
+    """O que o preenchimento determinístico entrega dos 10 campos."""
+    from modulos.ata_maker.levantamento import (
+        levantamento_para_markdown,
+        preencher_deterministico,
+        validar_levantamento,
+    )
+
+    dados = preencher_deterministico(caminho.read_text(encoding="utf-8"), nomes_conhecidos())
+    print("\n--- levantamento (10 campos) ---")
+    print(f"  problemas de schema: {validar_levantamento(dados) or 'nenhum'}")
+    info = dados.get("informacoes")
+    print(f"  menções objetivas encontradas: {len(info) if isinstance(info, list) else 0}")
+    if isinstance(info, list):
+        for m in info[:8]:
+            print(f"    [{m['ancora']}] {m['tipo']}: {m['valor']}")
+    print("\n  markdown (cabeçalhos e estado):")
+    for linha in levantamento_para_markdown(dados).splitlines():
+        if linha.startswith("###") or linha.startswith("_não mencionado"):
+            print(f"    {linha}")
 
 
 def _checar_nlp(caminho: Path) -> None:

@@ -7,7 +7,8 @@ from dataclasses import dataclass, field
 from core.especificacoes_llm import anexar_especificacoes
 from core.manual_voz import anexar_manual_voz_ao_sistema
 from core.openai_client import chat_completion, get_api_key
-from modulos.ata_maker.nlp import nlp_para_markdown, run_nlp_analysis
+from modulos.ata_maker.nlp import nlp_para_markdown, nomes_do_cadastro, run_nlp_analysis
+from modulos.ata_maker.normalizacao import bloco_fatos_reuniao, corrigir_nomes_asr
 from modulos.ata_maker.prompts_catalog import (
     PERSONA_OPCOES,
     PERSONA_TITLES,
@@ -88,7 +89,21 @@ def gerar_ata_prompt(
             erros.append(f"NLP: {exc}")
 
     template = prompt_custom or load_default_prompt()
-    filled = anexar_especificacoes(fill_prompt(template, transcricao), especificacoes)
+    extras: dict[str, str] = {}
+    corpo = transcricao
+    if "{{CABECALHO_FATOS}}" in template:
+        # O modelo não precisa adivinhar duração, data nem participantes: recebe medido.
+        try:
+            nomes = nomes_do_cadastro()
+            extras["CABECALHO_FATOS"] = bloco_fatos_reuniao(transcricao, nomes)
+            # A transcrição vai corrigida junto: o cabeçalho diz "Lindia" e o corpo
+            # precisa dizer o mesmo, senão o modelo trata como duas pessoas.
+            corpo = corrigir_nomes_asr(transcricao, nomes).texto
+        except Exception as exc:  # noqa: BLE001
+            erros.append(f"Cabeçalho factual: {exc}")
+            extras["CABECALHO_FATOS"] = "(não foi possível apurar os fatos da gravação)"
+
+    filled = anexar_especificacoes(fill_prompt(template, corpo, **extras), especificacoes)
     partes.append(_enviar(filled, incluir_manual_voz=incluir_manual_voz))
 
     if nlp_md:

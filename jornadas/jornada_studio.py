@@ -8,8 +8,10 @@ from pathlib import Path
 import streamlit as st
 
 from core.especificacoes_llm import campo_especificacoes_llm
+from core.apresentacao_visual import gerar_apresentacao_visual
 from core.export_infografico import gerar_infografico
 from core.export_pptx import gerar_apresentacao_pptx
+from core.infografico_visual import gerar_html_infografico_visual
 from core.openai_client import get_api_key
 from core.outputs_collector import listar_docx_jornadas
 from core.utils import OUTPUTS_DIR, ensure_dirs
@@ -103,16 +105,18 @@ def _painel_downloads_notebooklm() -> None:
 def _painel_downloads_locais() -> None:
     pptx = st.session_state.get("studio_pptx")
     info = st.session_state.get("studio_infografico")
+    visual = st.session_state.get("studio_infografico_visual")
     tem_pptx = bool(pptx and Path(pptx).exists())
     tem_info = bool(info and Path(info).exists())
-    if not tem_pptx and not tem_info:
+    tem_visual = bool(visual and Path(visual).exists())
+    if not tem_pptx and not tem_info and not tem_visual:
         return
 
-    st.subheader("Downloads locais")
+    st.subheader("Downloads das skills locais")
     if tem_pptx:
         path = Path(pptx)
         st.download_button(
-            label=f"Baixar PPTX local — {path.name}",
+            label=f"Baixar apresentacao-visual — {path.name}",
             data=path.read_bytes(),
             file_name=path.name,
             mime=_mime_slides(path),
@@ -120,15 +124,29 @@ def _painel_downloads_locais() -> None:
             use_container_width=True,
             key="dl_studio_pptx",
         )
+    if tem_visual:
+        path = Path(visual)
+        st.success(f"infografico-visual: `{path.name}`")
+        st.download_button(
+            label=f"Baixar infografico-visual — {path.name}",
+            data=path.read_bytes(),
+            file_name=path.name,
+            mime="text/html",
+            type="primary",
+            use_container_width=True,
+            key="dl_studio_html_visual",
+        )
+        with st.expander("Prévia HTML (trecho)", expanded=False):
+            st.code(path.read_text(encoding="utf-8")[:4000], language="html")
     if tem_info:
         path = Path(info)
+        st.caption("PNG legado")
         st.image(str(path), use_container_width=True)
         st.download_button(
-            label=f"Baixar infográfico local — {path.name}",
+            label=f"Baixar PNG legado — {path.name}",
             data=path.read_bytes(),
             file_name=path.name,
             mime="image/png",
-            type="primary",
             use_container_width=True,
             key="dl_studio_png",
         )
@@ -136,17 +154,17 @@ def _painel_downloads_locais() -> None:
 
 def render() -> None:
     render_cabecalho(
-        "Jornada Studio: autenticar no Google → selecionar artefatos "
-        "(sessão ou computador) → gerar no NotebookLM → baixar nesta tela."
+        "Jornada Studio: NotebookLM (opcional) ou skills locais "
+        "`apresentacao-visual` + `infografico-visual`."
     )
 
     st.markdown(
         '<div class="jornada-card">'
-        "<b>NotebookLM:</b> "
-        "1) <b>Autenticar (nova janela)</b> — login Google no Chrome. "
-        "2) <b>Selecionar</b> documentos de <code>outputs/</code> e/ou "
-        "enviar arquivos do computador. "
-        "3) <b>Gerar no NotebookLM</b> — o download aparece nesta aplicação."
+        "<b>Dois caminhos:</b> "
+        "(A) <b>NotebookLM</b> — autenticar Google → gerar slides/infográfico. "
+        "(B) <b>Skills locais</b> — "
+        "<code>apresentacao-visual</code> (PPTX) e "
+        "<code>infografico-visual</code> (HTML), sem Google."
         "</div>",
         unsafe_allow_html=True,
     )
@@ -318,62 +336,135 @@ def render() -> None:
                         st.error("Detalhes:\n- " + "\n- ".join(result.falhas))
                     if any("infográfico" in f for f in result.falhas):
                         st.info(
-                            "O infográfico do NotebookLM costuma esbarrar em quota "
-                            "diária da conta Google. Use **Gerar infográfico local** "
-                            "logo abaixo — mesmas fontes, imagem 16:9 via ChatGPT."
+                            "Quota do NotebookLM? Use abaixo as skills locais "
+                            "**apresentacao-visual** (PPTX) e **infografico-visual** (HTML)."
                         )
 
     st.divider()
-    st.subheader("Artefatos locais (OpenAI — sem NotebookLM)")
-    st.caption(
-        "Infográfico local usa o prompt corporativo 16:9 via ChatGPT Images. "
-        "Prefira .docx/.txt/.md para o export local."
+    st.subheader("3 · Skills visuais locais (sem Google)")
+    st.markdown(
+        "Caminho padrão da aplicação: skills **`apresentacao-visual`** e "
+        "**`infografico-visual`** — mesmas regras do Cursor, via LLM + "
+        "`python-pptx` / HTML responsivo."
     )
     if not get_api_key():
-        st.warning("Configure `OPENAI_API_KEY` para PPTX e infográfico locais.")
+        st.warning("Configure a chave do provedor LLM para usar as skills locais.")
 
     if not caminhos:
         st.caption(
-            "Selecione ou envie documentos na seção 2 para gerar artefatos locais."
+            "Selecione ou envie documentos na seção 2 para gerar com as skills."
         )
         _painel_downloads_locais()
         return
 
     especificacoes = campo_especificacoes_llm("jornada_studio_especificacoes")
 
-    p1, p2 = st.columns(2)
-    with p1:
+    c1, c2 = st.columns(2)
+    with c1:
         if st.button(
-            "Gerar PPTX local",
+            "apresentacao-visual → PPTX",
             use_container_width=True,
             disabled=not get_api_key(),
+            type="primary",
+            help="Skill apresentacao-visual: capa, contexto, ideia, 4–8 slides, síntese, aplicação.",
         ):
-            with st.spinner("Gerando apresentação local…"):
+            with st.spinner("Skill apresentacao-visual…"):
                 try:
-                    pptx = gerar_apresentacao_pptx(
+                    pptx = gerar_apresentacao_visual(
                         caminhos, especificacoes=especificacoes
                     )
                     st.session_state["studio_pptx"] = str(pptx)
                     st.success(f"Salvo: `{pptx.name}`")
                     st.rerun()
                 except Exception as exc:  # noqa: BLE001
-                    st.error(f"Falha PPTX: {exc}")
-    with p2:
+                    st.error(f"Falha apresentacao-visual: {exc}")
+    with c2:
         if st.button(
-            "Gerar infográfico local",
+            "infografico-visual → HTML",
             use_container_width=True,
             disabled=not get_api_key(),
+            type="primary",
+            help="Skill infografico-visual: página HTML colorida, Lucide, escaneável.",
         ):
-            with st.spinner("Extraindo conteúdo → prompt 16:9 → imagem ChatGPT…"):
+            with st.spinner("Skill infografico-visual…"):
                 try:
-                    png, html_path = gerar_infografico(
+                    html_path = gerar_html_infografico_visual(
                         caminhos, especificacoes=especificacoes
                     )
-                    st.session_state["studio_infografico"] = str(png)
-                    st.session_state["studio_infografico_html"] = str(html_path)
-                    st.success(f"Salvo: `{png.name}`")
+                    st.session_state["studio_infografico_visual"] = str(html_path)
+                    st.success(f"Salvo: `{html_path.name}`")
                     st.rerun()
                 except Exception as exc:  # noqa: BLE001
-                    st.error(f"Falha infográfico: {exc}")
+                    st.error(f"Falha infografico-visual: {exc}")
+
+    if st.button(
+        "Gerar as duas skills (PPTX + HTML)",
+        use_container_width=True,
+        disabled=not get_api_key(),
+        key="btn_skills_visuais_ambas",
+    ):
+        erros: list[str] = []
+        with st.spinner("apresentacao-visual → infografico-visual…"):
+            try:
+                pptx = gerar_apresentacao_visual(
+                    caminhos, especificacoes=especificacoes
+                )
+                st.session_state["studio_pptx"] = str(pptx)
+            except Exception as exc:  # noqa: BLE001
+                erros.append(f"apresentacao-visual: {exc}")
+            try:
+                html_path = gerar_html_infografico_visual(
+                    caminhos, especificacoes=especificacoes
+                )
+                st.session_state["studio_infografico_visual"] = str(html_path)
+            except Exception as exc:  # noqa: BLE001
+                erros.append(f"infografico-visual: {exc}")
+        if erros:
+            st.error(" · ".join(erros))
+        else:
+            st.success("PPTX e HTML gerados com as skills visuais.")
+            st.rerun()
+
+    with st.expander("Alternativas legadas (PNG / outline clássico)", expanded=False):
+        st.caption(
+            "PNG via Images API (texto pode sair corrompido) e outline PPTX antigo."
+        )
+        a1, a2 = st.columns(2)
+        with a1:
+            if st.button(
+                "Infográfico PNG 16:9",
+                use_container_width=True,
+                disabled=not get_api_key(),
+                key="btn_png_legado",
+            ):
+                with st.spinner("PNG via Images API…"):
+                    try:
+                        png, html_path = gerar_infografico(
+                            caminhos, especificacoes=especificacoes
+                        )
+                        st.session_state["studio_infografico"] = str(png)
+                        st.session_state["studio_infografico_html"] = str(html_path)
+                        st.success(f"Salvo: `{png.name}`")
+                        st.rerun()
+                    except Exception as exc:  # noqa: BLE001
+                        st.error(f"Falha PNG: {exc}")
+        with a2:
+            if st.button(
+                "PPTX outline clássico",
+                use_container_width=True,
+                disabled=not get_api_key(),
+                key="btn_pptx_classico",
+                help="Agora encaminha para apresentacao-visual (mesmo resultado do botão principal).",
+            ):
+                with st.spinner("PPTX…"):
+                    try:
+                        pptx = gerar_apresentacao_pptx(
+                            caminhos, especificacoes=especificacoes
+                        )
+                        st.session_state["studio_pptx"] = str(pptx)
+                        st.success(f"Salvo: `{pptx.name}`")
+                        st.rerun()
+                    except Exception as exc:  # noqa: BLE001
+                        st.error(f"Falha PPTX: {exc}")
 
     _painel_downloads_locais()
